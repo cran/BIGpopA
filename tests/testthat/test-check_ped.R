@@ -7,7 +7,7 @@ write_ped <- function(df) {
   f
 }
 
-context("check_ped – Pedigree Quality Checks")
+#context("check_ped – Pedigree Quality Checks")
 
 
 # Return structure

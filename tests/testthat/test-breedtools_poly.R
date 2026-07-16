@@ -1,4 +1,4 @@
-context("BreedTools - solve_composition_poly")
+#context("BreedTools - solve_composition_poly")
 
 #  Shared fixtures 
 ref_file      <- system.file("test_ref.txt",  package = "BIGpopA")

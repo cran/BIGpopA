@@ -1,3 +1,6 @@
+# BIGpopA 1.0.6
+- Added a "BIGpopA Tutorial" vignette demonstrating the pedigree cleaning, validation, parentage assignment, and breed/line composition workflow
+
 # BIGpopA 1.0.5
 - Updated package title and example on function descriptions to pass CRAN review
 

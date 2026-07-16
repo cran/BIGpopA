@@ -1,0 +1,295 @@
+---
+title: "BIGpopA Tutorial"
+subtitle: "Pedigree cleaning, validation, and parentage assignment from SNP genotype data"
+author: "Breeding Insight - Josue Chinchilla-Vargas"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+vignette: >
+  %\VignetteIndexEntry{BIGpopA Tutorial}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 7,
+  fig.height = 4.5
+)
+```
+
+# Introduction
+
+This tutorial demonstrates a typical pedigree workflow using the BIGpopA R
+package, the analytical engine behind
+[Familia](https://github.com/Breeding-Insight/Familia), Breeding Insight's
+Shiny application for pedigree validation and ancestry assessment. We run three
+functions in sequence:
+
+* check_ped() &mdash; detect and correct structural pedigree errors
+  (duplicates, conflicting trios, inconsistent sex roles, missing parents).
+* validate_pedigree() &mdash; test parent&ndash;offspring trios for Mendelian
+  errors against SNP genotypes and flag incorrect assignments.
+* find_parentage() &mdash; assign the most likely parent(s) to progeny from a
+  pool of candidate parents.
+
+It also estimates genome-wide breed/line composition for diploid and polyploid
+populations with allele_freq_poly() and solve_composition_poly(), shown at the
+end.
+
+The methods are species-agnostic and apply to a wide range of plant and animal
+breeding programs.
+
+## Install
+
+* It requires R version superior to 4.4.0
+
+Install BIGpopA from CRAN (if not already installed):
+
+```{r, eval=FALSE}
+install.packages("BIGpopA")
+```
+
+# Input data
+
+BIGpopA uses a small toy dataset that exercises every result category. Each
+function accepts a file path or a data.frame / data.table; to keep this
+vignette self-contained we build the objects inline: a pedigree, a SNP genotype
+matrix coded 0/1/2, and candidate parent / progeny lists.
+
+```{r}
+library(BIGpopA)
+
+# SNP genotypes coded 0/1/2 (NA = missing); C_low is mostly missing
+genotypes = data.frame(
+  id    = c("M1","F1","M2","F2","C1","C2","C3","C_bad","C_low"),
+  snp01 = c(  0,   0,   2,   2,   0,   2,   1,     0,     NA),
+  snp02 = c(  0,   0,   2,   0,   0,   1,   0,     0,     NA),
+  snp03 = c(  0,   2,   0,   2,   1,   1,   1,     1,     NA),
+  snp04 = c(  0,   2,   0,   0,   1,   0,   0,     1,     NA),
+  snp05 = c(  2,   0,   1,   1,   1,   1,   1,     1,     NA),
+  snp06 = c(  2,   0,   1,   0,   1,   1,   1,     1,     NA),
+  snp07 = c(  2,   2,   0,   1,   2,   0,   2,     2,     NA),
+  snp08 = c(  2,   2,   2,   2,   2,   2,   2,     2,     NA),
+  snp09 = c(  0,   1,   0,   2,   1,   1,   1,     1,      0),
+  snp10 = c(  0,   1,   2,   0,   0,   1,   0,     0,      0),
+  snp11 = c(  2,   1,   1,   2,   1,   2,   2,     1,      2),
+  snp12 = c(  2,   1,   0,   1,   2,   1,   1,     2,      2),
+  stringsAsFactors = FALSE
+)
+
+# pedigree with founders coded 0, a mis-assigned trio (C_bad),
+# and a duplicated row (C_missing)
+pedigree = data.frame(
+  id            = c("M1","F1","M2","F2","C1","C2","C3","C_bad","C_low","C_missing","C_missing"),
+  male_parent   = c("0", "0", "0", "0", "M1","M2","M1","M2",   "M1",   "M1",       "M1"),
+  female_parent = c("0", "0", "0", "0", "F1","F2","F2","F1",   "F1",   "F1",       "F1"),
+  stringsAsFactors = FALSE
+)
+
+# candidate parents (with sex) and progeny to assign
+parents = data.frame(
+  id  = c("M1","M2","F1","F2"),
+  sex = c("M", "M", "F", "F"),
+  stringsAsFactors = FALSE
+)
+
+progeny = data.frame(
+  id = c("C1","C2","C3","C_bad","C_low","C_missing"),
+  stringsAsFactors = FALSE
+)
+
+pedigree
+genotypes
+```
+
+The pedigree has four founders (M1, F1, M2, F2, both parents coded 0) and
+several crosses, including a deliberately duplicated row (C_missing), a
+mis-assigned trio (C_bad), and a sample with mostly missing genotypes (C_low).
+
+# Pedigree cleaning
+
+check_ped() operates on the pedigree columns id, male_parent, female_parent.
+Exact duplicates and missing parents are always corrected; conflicting trios
+and inconsistent sex roles are corrected by default. Cycles are reported only
+and must be resolved manually. Set verbose = TRUE to print a full report to the
+console.
+
+```{r}
+#check_ped
+clean_ped_results = check_ped(pedigree, verbose = FALSE)
+
+# the corrected, analysis-ready pedigree
+clean_ped = clean_ped_results$corrected_pedigree
+clean_ped
+```
+
+The returned list also exposes per-issue tables for review, e.g.
+clean_ped_results$exact_duplicates (here, the repeated C_missing row) and
+clean_ped_results$missing_parents.
+
+# Pedigree validation
+
+validate_pedigree() compares each trio against the genotype matrix and computes
+a Mendelian error rate. Trios are classified as pass, fail, low_markers,
+no_genotype_data, founders, or missing_parents, and a best-matching replacement
+parent is suggested where relevant. With plot_results = TRUE the function draws
+a histogram of trio error percentages.
+
+```{r}
+#validate_ped
+ped_validate_results = validate_pedigree(clean_ped, genotypes,
+                                         verbose = FALSE, plot_results = TRUE)
+
+ped_validate_report = ped_validate_results$full_results
+ped_validate_report
+```
+
+Reading the status column: C1, C2, C3 pass; C_bad fails (its recorded male
+parent shows a high homozygous-mismatch rate, so the recommended correction is
+to remove it); C_low is flagged low_markers because too few markers were
+genotyped; and C_missing has no_genotype_data. Key tuning arguments are
+trio_error_threshold (default 5.0), min_markers (default 10), and
+single_parent_error_threshold (default 2.0).
+
+# Parentage assignment
+
+When parentage is unknown, find_parentage() searches a pool of candidate
+parents for the best assignment to each progeny. The method argument selects
+the search: best_pair (default), best_male_parent, best_female_parent, or
+best_match.
+
+```{r}
+#find_parentage
+find_parentage_results = find_parentage(genotypes, parents, progeny,
+                                        method = "best_pair",
+                                        verbose = FALSE, plot_results = TRUE)
+
+find_parentage_report = find_parentage_results$full_results
+find_parentage_report
+```
+
+Each progeny is assigned the pair minimizing Mendelian error and labelled pass,
+high_error, or low_markers. Notice that C_bad, which failed validation against
+its recorded parents, is here correctly recovered to its true pair (M1/F1) at
+0% error, while C_low remains low_markers. Useful arguments include
+error_threshold, min_markers, show_ties, allow_parent_selfing, and
+exclude_self_match.
+
+# Breed and line composition
+
+Beyond pedigree QC, BIGpopA estimates genome-wide breed or line composition for
+diploid and polyploid populations using a breedTools-style quadratic
+programming approach (Funkhouser et al. 2017). This example mirrors a blueberry
+(autotetraploid, ploidy = 4) analysis that assigns validation samples to two
+cultivar reference panels, Jewel and Draper.
+
+The workflow has two steps: compute reference-panel allele frequencies with
+allele_freq_poly(), then estimate each validation sample's composition with
+solve_composition_poly().
+
+```{r}
+library(dplyr)
+
+# reference genotypes: individuals x SNPs, tetraploid dosage of allele B (0..4)
+reference = data.frame(
+  S1 = c(0, 1, 0, 4, 3, 4),
+  S2 = c(1, 0, 0, 3, 4, 4),
+  S3 = c(0, 1, 1, 4, 3, 3),
+  S4 = c(1, 0, 1, 3, 4, 3),
+  S5 = c(0, 1, 0, 4, 3, 4),
+  S6 = c(1, 0, 1, 3, 4, 3),
+  row.names = c("Jewel1","Jewel2","Jewel3","Draper1","Draper2","Draper3")
+)
+
+# reference panel membership (which individuals define each cultivar)
+ref_ids = list(
+  Jewel  = c("Jewel1","Jewel2","Jewel3"),
+  Draper = c("Draper1","Draper2","Draper3")
+)
+
+# allele frequencies of the reference panels (SNPs x panels)
+freq = allele_freq_poly(reference, ref_ids, ploidy = 4)
+freq
+```
+
+```{r}
+# validation samples to assign: samples x SNPs (same SNPs as the reference)
+validation = data.frame(
+  S1 = c(0, 4, 2),
+  S2 = c(1, 3, 2),
+  S3 = c(0, 4, 2),
+  S4 = c(1, 3, 2),
+  S5 = c(0, 4, 2),
+  S6 = c(1, 3, 2),
+  row.names = c("Sample1","Sample2","Sample3")
+)
+
+# breed/line composition (panel columns plus an R2 model-fit column)
+prediction = as.data.frame(solve_composition_poly(validation, freq, ploidy = 4))
+prediction
+```
+
+It is important to note that while the model produces an R2 value, it is expected to be low since an allele dosage (discrete number) is being regressed on an allele frequency (continuous value).
+
+Assign each sample to the cultivar with the highest composition (ignoring the
+R2 fit column) and format the panel columns as percentages:
+
+
+```{r}
+line_cols = setdiff(names(prediction), "R2")
+
+pred_results = prediction %>%
+  mutate(
+    ID             = rownames(prediction),
+    predicted_line = line_cols[max.col(as.matrix(prediction[line_cols]), ties.method = "first")],
+    across(all_of(line_cols), ~ scales::percent(., accuracy = 0.1))
+  ) %>%
+  select(ID, predicted_line, all_of(line_cols))
+
+pred_results
+```
+
+Sample1 is assigned Jewel and Sample2 Draper (each essentially 100%), while the
+admixed Sample3 splits roughly evenly between them. For diploid data set
+ploidy = 2. Save the table with
+write.table(pred_results, "composition.txt", sep = "\t", row.names = FALSE).
+
+# Complete workflow
+
+```{r, eval=FALSE}
+# pedigree quality control
+clean_ped = check_ped(pedigree)$corrected_pedigree
+validated = validate_pedigree(clean_ped, genotypes)$full_results
+assigned  = find_parentage(genotypes, parents, progeny, method = "best_pair")$full_results
+
+# breed/line composition
+freq       = allele_freq_poly(reference, ref_ids, ploidy = 4)
+prediction = solve_composition_poly(validation, freq, ploidy = 4)
+```
+
+# Session information
+
+```{r}
+sessionInfo()
+```
+
+# How to cite
+
+If you use BIGpopA in research, run citation("BIGpopA") for the current
+reference.
+
+```{r}
+citation("BIGpopA")
+```
+
+# Acknowledgments
+
+Developed as part of the [Breeding Insight](https://breedinginsight.org/)
+initiative to provide open-source, data-driven tools for modern breeding programs.

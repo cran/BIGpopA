@@ -1,6 +1,6 @@
 Package: BIGpopA
 Title: Pedigree Validation Genetic Composition of Diploids & Polyploids
-Version: 1.0.5
+Version: 1.0.6
 Authors@R: c(person(given='Josue',
                     family='Chinchilla-Vargas',
                     email='josue.chinchilla@ufl.edu',
@@ -21,17 +21,20 @@ Description: Tools for pedigree quality control and genomic breed/line
     diploid and polyploid species. For more details about the included 'breedTools' 
     functions, see Funkhouser et al. (2017) <doi:10.2527/tas2016.0003>.
 License: Apache License (>= 2)
-URL: https://github.com/Breeding-Insight/BIGpopA
+URL: https://CRAN.R-project.org/package=BIGpopA,
+        https://github.com/Breeding-Insight/BIGpopA
 BugReports: https://github.com/Breeding-Insight/BIGpopA/issues
 Encoding: UTF-8
 Depends: R (>= 4.4.0)
 Imports: dplyr, janitor, quadprog, data.table, ggplot2
-Suggests: covr, knitr (>= 1.10), rmarkdown, testthat (>= 3.0.0)
+Suggests: covr, knitr (>= 1.10), rmarkdown, scales, testthat (>= 3.0.0)
+VignetteBuilder: knitr
+Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0
 NeedsCompilation: no
-Packaged: 2026-06-18 20:36:44 UTC; josue.chinchilla
+Packaged: 2026-07-16 20:36:53 UTC; josue.chinchilla
 Author: Josue Chinchilla-Vargas [cre, aut],
   Alexander Sandercock [aut],
   University of Florida [cph] (Breeding Insight)
 Repository: CRAN
-Date/Publication: 2026-06-24 08:20:24 UTC
+Date/Publication: 2026-07-16 20:50:12 UTC
