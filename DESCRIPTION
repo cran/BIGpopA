@@ -1,6 +1,6 @@
 Package: BIGpopA
 Title: Pedigree Validation Genetic Composition of Diploids & Polyploids
-Version: 1.0.6
+Version: 2.0.0
 Authors@R: c(person(given='Josue',
                     family='Chinchilla-Vargas',
                     email='josue.chinchilla@ufl.edu',
@@ -17,8 +17,10 @@ Description: Tools for pedigree quality control and genomic breed/line
     'BIGpopA' provides functions to check and correct common pedigree
     errors, assign parentage from SNP genotype data using Mendelian error
     rates, validate parent-offspring trios, and estimate genome-wide
-    breed or line composition using quadratic programming. Supports both
-    diploid and polyploid species. For more details about the included 'breedTools' 
+    breed or line composition using quadratic programming. Pedigree
+    validation and parentage assignment support any ploidy, using a
+    polysomic Mendelian test for even ploidy and a homozygosity-based
+    check for odd ploidy. For more details about the included 'breedTools'
     functions, see Funkhouser et al. (2017) <doi:10.2527/tas2016.0003>.
 License: Apache License (>= 2)
 URL: https://CRAN.R-project.org/package=BIGpopA,
@@ -32,9 +34,9 @@ VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0
 NeedsCompilation: no
-Packaged: 2026-07-16 20:36:53 UTC; josue.chinchilla
+Packaged: 2026-08-21 13:20:47 UTC; josue.chinchilla
 Author: Josue Chinchilla-Vargas [cre, aut],
   Alexander Sandercock [aut],
   University of Florida [cph] (Breeding Insight)
 Repository: CRAN
-Date/Publication: 2026-07-16 20:50:12 UTC
+Date/Publication: 2026-08-21 21:50:57 UTC

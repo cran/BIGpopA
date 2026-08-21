@@ -10,7 +10,7 @@
 <!-- badges: end -->
 
 <div align="center">
-  <img width="250" height="250" alt="BIGpopa_logo" src="https://github.com/user-attachments/assets/3560cb73-6939-4af6-ab41-045b8a1598c3" />
+  <img width="250" height="250" alt="BIGpopa_logo" src="man/figures/BIGpopa_logo.png" />
 </div>
 
 
@@ -39,4 +39,4 @@ BIGpopA development is supported by Breeding Insight, a USDA-funded initiative b
 ## Citation
 If you use BIGpopA in your research, please cite as:
 
-Chinchilla-Vargas, Josue, and Breeding Insight Team. 2026. "BIGpopA: Pedigree Validation and Breed/Line Composition Estimation for Diploid and Polyploid Species." R package version 1.0.6. https://github.com/Breeding-Insight/BIGpopA.
+Chinchilla-Vargas, Josue, and Breeding Insight Team. 2026. "BIGpopA: Pedigree Validation and Breed/Line Composition Estimation for Diploid and Polyploid Species." R package version 2.0.0. https://github.com/Breeding-Insight/BIGpopA.

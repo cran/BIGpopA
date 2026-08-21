@@ -26,6 +26,13 @@
 #'   the console (default: TRUE).
 #' @param plot_results Logical. If TRUE, prints a histogram of trio Mendelian
 #'   error percentages with a threshold line (default: TRUE).
+#' @param ploidy Integer >= 2. Ploidy level of the species (2 = diploid,
+#'   4 = tetraploid, ...). Genotypes must be coded as allele-B dosage
+#'   (0, 1, ..., ploidy). Even ploidy uses the polysomic gamete-range Mendelian
+#'   test (assumes autopolyploid inheritance; conservative for allopolyploids).
+#'   Odd ploidy (e.g. triploid), where balanced gametes are undefined, falls
+#'   back to a model-free opposite-homozygote exclusion evaluated on
+#'   homozygous-informative markers only (reduced power). Default is 2.
 #'
 #' @return An invisible named list with the following elements:
 #' \describe{
@@ -84,7 +91,8 @@ validate_pedigree <- function(pedigree_file, genotypes_file,
                               min_markers                   = 10,
                               single_parent_error_threshold = 2.0,
                               verbose                       = TRUE,
-                              plot_results                  = TRUE) {
+                              plot_results                  = TRUE,
+                              ploidy                        = 2) {
 
   ## silence R CMD check NOTEs
   id <- male_parent <- female_parent <- status <- trio_mendelian_error_pct <- NULL
@@ -95,6 +103,7 @@ validate_pedigree <- function(pedigree_file, genotypes_file,
     stop("trio_error_threshold must be between 0 and 100")
   if (single_parent_error_threshold < 0 || single_parent_error_threshold > 100)
     stop("single_parent_error_threshold must be between 0 and 100")
+  .check_ploidy(ploidy)
 
   # Accept file path OR in-memory data.frame / data.table
   read_flex <- function(x, label, ...) {
@@ -146,7 +155,7 @@ validate_pedigree <- function(pedigree_file, genotypes_file,
   genos_hom   <- data.table::copy(genos)
   marker_cols <- base::setdiff(base::names(genos_hom), "id")
   for (col in marker_cols)
-    genos_hom[base::get(col) == 1, (col) := NA_integer_]
+    genos_hom[base::get(col) > 0 & base::get(col) < ploidy, (col) := NA_integer_]
   genos_hom_mat <- base::as.matrix(genos_hom, rownames = "id")
 
   #### Identify trios missing from the genotype file ####
@@ -231,19 +240,14 @@ validate_pedigree <- function(pedigree_file, genotypes_file,
         male_parent_vec   <- genos_mat[male_parent_id, ]
         female_parent_vec <- genos_mat[female_parent_id, ]
         mismatches <- base::sum(
-          (male_parent_vec == 0 & female_parent_vec == 0 & progeny_vec > 0) |
-            (male_parent_vec == 2 & female_parent_vec == 2 & progeny_vec < 2) |
-            ((male_parent_vec == 0 & female_parent_vec == 1) |
-               (male_parent_vec == 1 & female_parent_vec == 0)) & (progeny_vec == 2) |
-            ((male_parent_vec == 2 & female_parent_vec == 1) |
-               (male_parent_vec == 1 & female_parent_vec == 2)) & (progeny_vec == 0) |
-            ((male_parent_vec == 0 & female_parent_vec == 2) |
-               (male_parent_vec == 2 & female_parent_vec == 0)) & (progeny_vec != 1),
+          .mend_mismatch(male_parent_vec, female_parent_vec,
+                         progeny_vec, ploidy),
           na.rm = TRUE
         )
-        markers_tested <- base::sum(!base::is.na(male_parent_vec) &
-                                      !base::is.na(female_parent_vec) &
-                                      !base::is.na(progeny_vec))
+        markers_tested <- base::sum(
+          .mend_testable(male_parent_vec, female_parent_vec,
+                         progeny_vec, ploidy)
+        )
         if (markers_tested == 0) {
           status              <- "no_data"
           correction_decision <- "none"
