@@ -86,69 +86,19 @@ test_that("breed composition proportions sum to 1 for each animal", {
   expect_true(all(abs(row_sums - 1) < 1e-6))
 })
 
-#  6. groups argument returns a named list 
-test_that("groups argument returns a named list of data.frames", {
-  skip_if_not(existsFunction("QPseparate", where = asNamespace("BIGpopA")),
-              "QPseparate not available — skipping groups test.")
-  
-  all_ids <- rownames(validation)
-  half    <- floor(length(all_ids) / 2)
-  groups  <- list(GroupA = all_ids[1:half],
-                  GroupB = all_ids[(half + 1):length(all_ids)])
-  
-  result <- solve_composition_poly(validation, freq, groups = groups, ploidy = 4)
-  
-  expect_type(result, "list")
-  expect_named(result, c("GroupA", "GroupB"))
+#  6. Removed ped / groups options are no longer accepted
+test_that("ped, groups, mia, sire and dam arguments were removed", {
+  expect_identical(names(formals(solve_composition_poly)), c("Y", "X", "ploidy"))
+  expect_error(solve_composition_poly(validation, freq, groups = list(), ploidy = 4),
+               "unused argument")
 })
 
-#  7. ped argument: basic composition with pedigree 
-test_that("ped argument runs and returns a data.frame", {
-  ped_file <- system.file("test_ped.txt", package = "BIGpopA")
-  skip_if_not(file.exists(ped_file), "Pedigree test file not available.")
-  
-  ped    <- read.table(ped_file, header = TRUE, sep = "\t")
-  result <- solve_composition_poly(validation, freq, ped = ped, ploidy = 4)
-  
-  expect_s3_class(as.data.frame(result), "data.frame")
-  expect_true(nrow(result) > 0)
-})
-
-#  8. mia flag returns MIA data.frame 
-test_that("mia = TRUE returns maternally inherited allele data.frame", {
-  ped_file <- system.file("test_ped.txt", package = "BIGpopA")
-  skip_if_not(file.exists(ped_file), "Pedigree test file not available.")
-  
-  ped    <- read.table(ped_file, header = TRUE, sep = "\t")
-  result <- solve_composition_poly(validation, freq, ped = ped,
-                                   mia = TRUE, ploidy = 4)
-  
-  expect_s3_class(as.data.frame(result), "data.frame")
-  expect_true(ncol(result) > 0)
-})
-
-#  9. sire flag returns sire genotype data.frame 
-test_that("sire = TRUE returns sire genotype data.frame", {
-  ped_file <- system.file("test_ped.txt", package = "BIGpopA")
-  skip_if_not(file.exists(ped_file), "Pedigree test file not available.")
-  
-  ped    <- read.table(ped_file, header = TRUE, sep = "\t")
-  result <- solve_composition_poly(validation, freq, ped = ped,
-                                   sire = TRUE, ploidy = 4)
-  
-  expect_s3_class(as.data.frame(result), "data.frame")
-})
-
-#  10. dam flag returns dam genotype data.frame 
-test_that("dam = TRUE returns dam genotype data.frame", {
-  ped_file <- system.file("test_ped.txt", package = "BIGpopA")
-  skip_if_not(file.exists(ped_file), "Pedigree test file not available.")
-  
-  ped    <- read.table(ped_file, header = TRUE, sep = "\t")
-  result <- solve_composition_poly(validation, freq, ped = ped,
-                                   dam = TRUE, ploidy = 4)
-  
-  expect_s3_class(as.data.frame(result), "data.frame")
+#  7. A single animal in Y returns one row
+test_that("a single animal in Y returns a one-row result", {
+  one <- validation[1, , drop = FALSE]
+  result <- solve_composition_poly(one, freq, ploidy = 4)
+  expect_equal(nrow(result), 1)
+  expect_identical(rownames(result), rownames(one))
 })
 
 #  11. Extra SNPs in Y not in X are silently dropped 

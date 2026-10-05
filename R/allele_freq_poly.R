@@ -2,9 +2,17 @@
 #'
 #' Computes allele frequencies for specified populations given SNP array data.
 #'
-#' @param geno matrix of genotypes coded as the dosage of allele B
-#'   (0, 1, 2, ..., ploidy) with individuals in rows (named) and SNPs in
-#'   columns (named).
+#' @param geno Genotypes coded as the dosage of allele B (0, 1, 2, ..., ploidy)
+#'   as any of: a matrix or data.frame with individuals in rows (named) and
+#'   SNPs in columns (named); a data.frame with an `id` / `ID` column followed
+#'   by SNP columns; a path to a TSV/CSV/TXT file whose first column holds the
+#'   IDs; a path to a VCF file (`.vcf` or `.vcf.gz`) or a `vcfR` object,
+#'   converted with [vcf_to_dosage()] using `ploidy`; or a path to a PLINK
+#'   `.ped` file (diploid only), converted with [ped_to_dosage()].
+#'
+#' @details When `geno` is a `.ped` file, the returned matrix carries a
+#'   `counted_allele` attribute. [solve_composition_poly()] uses it to code a
+#'   validation `.ped` file with the same counted allele at each marker.
 #' @param populations list of named populations. Each population has a vector
 #'   of IDs that belong to the population. Allele frequencies will be derived
 #'   from all animals in each population.
@@ -40,7 +48,11 @@
 #'
 #' @export
 allele_freq_poly <- function(geno, populations, ploidy = 2) {
-  
+
+  # Accept text files, VCFs, PLINK .ped, and in-memory tables (individuals x SNPs)
+  geno    <- .read_genotypes(geno, ploidy = ploidy, format = "matrix")
+  counted <- base::attr(geno, "counted_allele")   # set only for .ped input
+
   # Initialize returned df
   X <- matrix(NA, nrow = ncol(geno), ncol = length(populations))
   
@@ -63,6 +75,10 @@ allele_freq_poly <- function(geno, populations, ploidy = 2) {
   # Label X with populations and SNPs
   colnames(X) <- names(populations)
   rownames(X) <- colnames(geno)
-  
+
+  # Keep the .ped allele coding so solve_composition_poly() codes validation
+  #   .ped files the same way
+  if (!is.null(counted)) attr(X, "counted_allele") <- counted
+
   return(X)
 }

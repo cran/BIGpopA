@@ -111,7 +111,7 @@ genotypes
 
 The pedigree has four founders (M1, F1, M2, F2, both parents coded 0) and
 several crosses, including a deliberately duplicated row (C_missing), a
-mis-assigned trio (C_bad), and a sample with mostly missing genotypes (C_low).
+misassigned trio (C_bad), and a sample with mostly missing genotypes (C_low).
 
 # Pedigree cleaning
 
@@ -175,7 +175,7 @@ find_parentage_report = find_parentage_results$full_results
 find_parentage_report
 ```
 
-Each progeny is assigned the pair minimizing Mendelian error and labelled pass,
+Each progeny is assigned the pair minimizing Mendelian error and labeled pass,
 high_error, or low_markers. Notice that C_bad, which failed validation against
 its recorded parents, is here correctly recovered to its true pair (M1/F1) at
 0% error, while C_low remains low_markers. Useful arguments include
@@ -258,8 +258,8 @@ pred_results
 
 Sample1 is assigned Jewel and Sample2 Draper (each essentially 100%), while the
 admixed Sample3 splits roughly evenly between them. For diploid data set
-ploidy = 2. Save the table with
-write.table(pred_results, "composition.txt", sep = "\t", row.names = FALSE).
+`ploidy = 2`. Save the table with
+`write.table(pred_results, "composition.txt", sep = "\t", row.names = FALSE)`.
 
 # Complete workflow
 

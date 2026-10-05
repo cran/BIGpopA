@@ -74,6 +74,9 @@ check_ped <- function(ped.file,
     stop("ped.file must be a valid file path (character) or a data.frame / data.table.")
   }
   
+  # clean_names() already lower-cases; this also covers names it would not map
+  data <- .standardize_names(data, c("id", "male_parent", "female_parent"))
+
   required_cols <- c("id", "male_parent", "female_parent")
   missing_cols  <- setdiff(required_cols, colnames(data))
   if (length(missing_cols) > 0) {

@@ -3,28 +3,23 @@
 #' Computes genome-wide breed/ancestry composition using quadratic programming
 #' on a batch of animals.
 #'
-#' @param Y numeric matrix of genotypes (columns) from all animals (rows) in
-#'   the population, coded as dosage of allele B (0, 1, 2, ..., ploidy).
+#' @param Y Genotypes (columns) from all animals (rows) in the population,
+#'   coded as dosage of allele B (0, 1, 2, ..., ploidy), as any of: a numeric
+#'   matrix or data.frame with named rows; a data.frame with an `id` / `ID`
+#'   column followed by SNP columns; a path to a TSV/CSV/TXT file whose first
+#'   column holds the IDs; a path to a VCF file (`.vcf` or `.vcf.gz`) or a
+#'   `vcfR` object, converted with [vcf_to_dosage()] using `ploidy`; or a path
+#'   to a PLINK `.ped` file (diploid only), converted with [ped_to_dosage()].
+#'   A `.ped` file is coded with the `counted_allele` attribute of `X` when
+#'   present (see [allele_freq_poly()]), so reference and validation `.ped`
+#'   files count the same allele at each marker.
 #' @param X numeric matrix of allele frequencies (rows) from each reference
 #'   panel (columns). Frequencies are relative to allele B.
-#' @param ped data.frame giving pedigree information. Must be formatted with
-#'   columns: ID, Sire, Dam.
-#' @param groups list of IDs categorized by breed/population. If specified,
-#'   output will be a list of results categorized by breed/population.
-#' @param mia logical. Only applies if ped argument is supplied. If TRUE,
-#'   returns a data.frame containing the inferred maternally inherited allele
-#'   for each locus for each animal instead of breed composition results.
-#' @param sire logical. Only applies if ped argument is supplied. If TRUE,
-#'   returns a data.frame containing sire genotypes for each locus for each
-#'   animal instead of breed composition results.
-#' @param dam logical. Only applies if ped argument is supplied. If TRUE,
-#'   returns a data.frame containing dam genotypes for each locus for each
-#'   animal instead of breed composition results.
 #' @param ploidy integer. The ploidy level of the species (e.g., 2 for diploid,
 #'   3 for triploid).
 #'
-#' @return A data.frame, or a list of data.frames when groups is not NULL,
-#'   containing breed/ancestry composition results.
+#' @return A matrix with one row per animal, one column per reference
+#'   population (estimated proportions, summing to 1), and an `R2` column.
 #'
 #' @references Funkhouser SA, Bates RO, Ernst CW, Newcom D, Steibel JP.
 #'   Estimation of genome-wide and locus-specific breed composition in pigs.
@@ -58,52 +53,23 @@
 #' @export
 solve_composition_poly <- function(Y,
                                    X,
-                                   ped = NULL,
-                                   groups = NULL,
-                                   mia = FALSE,
-                                   sire = FALSE,
-                                   dam = FALSE,
                                    ploidy = 2) {
-  
+
+  # Accept text files, VCFs, PLINK .ped, and in-memory tables (animals x SNPs).
+  #   A .ped file reuses the reference panel's allele coding when available.
+  Y <- .read_genotypes(Y, ploidy = ploidy, format = "matrix",
+                       counted_allele = attr(X, "counted_allele"))
+
   # Functions require Y to be animals x SNPs. Transpose
   Y <- t(Y)
   
   # SNPs in Y should only be the ones present in X
-  Y <- Y[rownames(Y) %in% rownames(X), ]
+  Y <- Y[rownames(Y) %in% rownames(X), , drop = FALSE]   # keep a 1-animal Y as a matrix
   
-  # If ped is supplied, use QPsolve_par to compute genomic composition using
-  #   only animals who have genotyped parents (by incorporating Sire genotype).
-  if (!is.null(ped)) {
-    mat_results <- lapply(colnames(Y),
-                          QPsolve_par,
-                          Y,
-                          X,
-                          ped,
-                          mia = mia,
-                          sire = sire,
-                          dam = dam)
-    
-    mat_results_tab <- do.call(rbind, mat_results)
-    return (mat_results_tab)
-    
-    # Else if groups supplied - perform regular genomic computation
-    #   and list results by groups
-  } else if (!is.null(groups)) {
-    
-    # When using regular genomic computation - adjust dosage based on ploidy
-    Y <- Y / ploidy #(default is 2)
-    
-    grouped_results <- lapply(groups, QPseparate, Y, X)
-    return (grouped_results)
-    
-    # If neither using the ped or grouping option - just perform normal, unsegregated
-    #   calculation
-  } else {
-    
-    # Adjust dosage based on ploidy (default is 2)
-    Y <- Y / ploidy
-    
-    results <- t(apply(Y, 2, QPsolve, X))
-    return (results)
-  }
+  # Adjust dosage based on ploidy (default is 2)
+  Y <- Y / ploidy
+
+  # Solve the composition of each animal (column of Y)
+  results <- t(apply(Y, 2, QPsolve, X))
+  return (results)
 }

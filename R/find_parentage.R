@@ -4,8 +4,12 @@
 #' using Mendelian error rates or homozygous mismatch rates. Parents or progeny
 #' absent from the genotype file are removed with a warning.
 #'
-#' @param genotypes_file Path to a TSV/CSV/TXT file, OR a data.frame /
-#'   data.table with an 'id' column followed by marker columns coded as 0, 1, 2.
+#' @param genotypes_file Genotypes as any of: a path to a TSV/CSV/TXT file; a
+#'   path to a VCF file (`.vcf` or `.vcf.gz`) or a `vcfR` object, converted
+#'   with [vcf_to_dosage()] using `ploidy`; a path to a PLINK `.ped` file
+#'   (diploid only), converted with [ped_to_dosage()]; or a data.frame /
+#'   data.table with an 'id' column followed by marker columns coded as
+#'   allele-B dosage (0, 1, ..., ploidy).
 #' @param parents_file Path to a TSV/CSV/TXT file, OR a data.frame /
 #'   data.table with an 'id' column and an optional 'sex' column
 #'   ('M', 'F', or 'A'). If absent, all parents are treated as ambiguous.
@@ -128,13 +132,19 @@ find_parentage <- function(genotypes_file, parents_file, progeny_file,
   }
   
   tryCatch({
-    genos              <- read_flex(genotypes_file, "genotypes_file")
+    genos              <- .read_genotypes(genotypes_file, ploidy = ploidy,
+                                          format = "data.frame", verbose = verbose)
     all_parents        <- read_flex(parents_file,   "parents_file")
     progeny_candidates <- read_flex(progeny_file,   "progeny_file")
   }, error = function(e) {
-    stop("Error reading input files. Ensure paths are correct and files are TXT/CSV/TSV.")
+    stop("Error reading input files. Ensure paths are correct and files are TXT/CSV/TSV or VCF. (",
+         conditionMessage(e), ")")
   })
   
+  # Column names are matched ignoring case (e.g. ID, Sex)
+  all_parents        <- .standardize_names(all_parents,        c("id", "sex"))
+  progeny_candidates <- .standardize_names(progeny_candidates, "id")
+
   valid_ids       <- genos$id
   removed_parents <- base::setdiff(all_parents$id, valid_ids)
   if (base::length(removed_parents) > 0) {

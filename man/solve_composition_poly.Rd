@@ -4,48 +4,29 @@
 \alias{solve_composition_poly}
 \title{Compute Genome-Wide Breed Composition}
 \usage{
-solve_composition_poly(
-  Y,
-  X,
-  ped = NULL,
-  groups = NULL,
-  mia = FALSE,
-  sire = FALSE,
-  dam = FALSE,
-  ploidy = 2
-)
+solve_composition_poly(Y, X, ploidy = 2)
 }
 \arguments{
-\item{Y}{numeric matrix of genotypes (columns) from all animals (rows) in
-the population, coded as dosage of allele B (0, 1, 2, ..., ploidy).}
+\item{Y}{Genotypes (columns) from all animals (rows) in the population,
+coded as dosage of allele B (0, 1, 2, ..., ploidy), as any of: a numeric
+matrix or data.frame with named rows; a data.frame with an \code{id} / \code{ID}
+column followed by SNP columns; a path to a TSV/CSV/TXT file whose first
+column holds the IDs; a path to a VCF file (\code{.vcf} or \code{.vcf.gz}) or a
+\code{vcfR} object, converted with \code{\link[=vcf_to_dosage]{vcf_to_dosage()}} using \code{ploidy}; or a path
+to a PLINK \code{.ped} file (diploid only), converted with \code{\link[=ped_to_dosage]{ped_to_dosage()}}.
+A \code{.ped} file is coded with the \code{counted_allele} attribute of \code{X} when
+present (see \code{\link[=allele_freq_poly]{allele_freq_poly()}}), so reference and validation \code{.ped}
+files count the same allele at each marker.}
 
 \item{X}{numeric matrix of allele frequencies (rows) from each reference
 panel (columns). Frequencies are relative to allele B.}
-
-\item{ped}{data.frame giving pedigree information. Must be formatted with
-columns: ID, Sire, Dam.}
-
-\item{groups}{list of IDs categorized by breed/population. If specified,
-output will be a list of results categorized by breed/population.}
-
-\item{mia}{logical. Only applies if ped argument is supplied. If TRUE,
-returns a data.frame containing the inferred maternally inherited allele
-for each locus for each animal instead of breed composition results.}
-
-\item{sire}{logical. Only applies if ped argument is supplied. If TRUE,
-returns a data.frame containing sire genotypes for each locus for each
-animal instead of breed composition results.}
-
-\item{dam}{logical. Only applies if ped argument is supplied. If TRUE,
-returns a data.frame containing dam genotypes for each locus for each
-animal instead of breed composition results.}
 
 \item{ploidy}{integer. The ploidy level of the species (e.g., 2 for diploid,
 3 for triploid).}
 }
 \value{
-A data.frame, or a list of data.frames when groups is not NULL,
-containing breed/ancestry composition results.
+A matrix with one row per animal, one column per reference
+population (estimated proportions, summing to 1), and an \code{R2} column.
 }
 \description{
 Computes genome-wide breed/ancestry composition using quadratic programming

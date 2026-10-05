@@ -7,9 +7,13 @@
 allele_freq_poly(geno, populations, ploidy = 2)
 }
 \arguments{
-\item{geno}{matrix of genotypes coded as the dosage of allele B
-(0, 1, 2, ..., ploidy) with individuals in rows (named) and SNPs in
-columns (named).}
+\item{geno}{Genotypes coded as the dosage of allele B (0, 1, 2, ..., ploidy)
+as any of: a matrix or data.frame with individuals in rows (named) and
+SNPs in columns (named); a data.frame with an \code{id} / \code{ID} column followed
+by SNP columns; a path to a TSV/CSV/TXT file whose first column holds the
+IDs; a path to a VCF file (\code{.vcf} or \code{.vcf.gz}) or a \code{vcfR} object,
+converted with \code{\link[=vcf_to_dosage]{vcf_to_dosage()}} using \code{ploidy}; or a path to a PLINK
+\code{.ped} file (diploid only), converted with \code{\link[=ped_to_dosage]{ped_to_dosage()}}.}
 
 \item{populations}{list of named populations. Each population has a vector
 of IDs that belong to the population. Allele frequencies will be derived
@@ -23,6 +27,11 @@ columns.
 }
 \description{
 Computes allele frequencies for specified populations given SNP array data.
+}
+\details{
+When \code{geno} is a \code{.ped} file, the returned matrix carries a
+\code{counted_allele} attribute. \code{\link[=solve_composition_poly]{solve_composition_poly()}} uses it to code a
+validation \code{.ped} file with the same counted allele at each marker.
 }
 \examples{
 geno_matrix <- matrix(

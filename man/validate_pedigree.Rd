@@ -20,9 +20,12 @@ validate_pedigree(
 \item{pedigree_file}{Path to the pedigree file (TSV/CSV/TXT), OR a
 data.frame / data.table with columns: id, male_parent, female_parent.}
 
-\item{genotypes_file}{Path to the genotypes file (TSV/CSV/TXT), OR a
-data.frame / data.table with an id column followed by marker columns
-coded as 0, 1, 2.}
+\item{genotypes_file}{Genotypes as any of: a path to a TSV/CSV/TXT file; a
+path to a VCF file (\code{.vcf} or \code{.vcf.gz}) or a \code{vcfR} object, converted
+with \code{\link[=vcf_to_dosage]{vcf_to_dosage()}} using \code{ploidy}; a path to a PLINK \code{.ped} file
+(diploid only), converted with \code{\link[=ped_to_dosage]{ped_to_dosage()}}; or a data.frame /
+data.table with an id column followed by marker columns coded as
+allele-B dosage (0, 1, ..., ploidy).}
 
 \item{founders_file}{Character, optional. Path to a one-column file listing
 founder IDs. Founders with both parents coded as 0 are left unchanged.
