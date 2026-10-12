@@ -5,7 +5,7 @@
 #' columns, coded as the number of copies of the counted allele (0, 1, 2)
 #' with NA for missing calls. PLINK `.ped` files are diploid only.
 #'
-#' The `.ped` format stores allele letters rather than a reference/alternate
+#' The `.ped` format stores allele letters and has no reference/alternate
 #' pair, so the counted allele (allele B) is chosen per marker. By default it
 #' is the alphabetically / numerically last allele observed at the marker, so
 #' `1/2` coded files count allele `2` and an `A/G` marker counts `G`. To code a
@@ -71,112 +71,112 @@ ped_to_dosage <- function(ped,
                           verbose        = TRUE) {
 
   #### Input Validation ####
-  format <- base::match.arg(format)
-  if (!base::is.character(ped) || base::length(ped) != 1)
+  format <- match.arg(format)
+  if (!is.character(ped) || length(ped) != 1)
     stop("ped must be a path to a PLINK .ped file.")
-  if (!base::file.exists(ped))
+  if (!file.exists(ped))
     stop("PED file not found: ", ped)
-  if (!base::is.null(counted_allele) &&
-      (!base::is.character(counted_allele) || base::is.null(base::names(counted_allele))))
+  if (!is.null(counted_allele) &&
+      (!is.character(counted_allele) || is.null(names(counted_allele))))
     stop("counted_allele must be a named character vector (names = marker names).")
 
   #### Read the .ped ####
   raw <- data.table::fread(ped, header = FALSE, colClasses = "character",
                            data.table = FALSE)
-  n_allele_cols <- base::ncol(raw) - 6L
+  n_allele_cols <- ncol(raw) - 6L
   if (n_allele_cols < 2 || n_allele_cols %% 2 != 0)
     stop("The .ped file must have 6 pedigree columns followed by two allele ",
          "columns per marker (compound genotypes are not supported).")
   n_markers <- n_allele_cols %/% 2L
 
   ids <- raw[[2]]
-  dup <- base::unique(ids[base::duplicated(ids)])
-  if (base::length(dup) > 0)
+  dup <- unique(ids[duplicated(ids)])
+  if (length(dup) > 0)
     stop("Duplicated individual IDs (column 2) in the .ped file: ",
-         base::paste(dup, collapse = ", "))
+         paste(dup, collapse = ", "))
 
-  alleles <- base::as.matrix(raw[, -(1:6), drop = FALSE])
+  alleles <- as.matrix(raw[, -(1:6), drop = FALSE])
   alleles[alleles %in% missing_codes] <- NA
-  a1   <- alleles[, base::seq(1, n_allele_cols, by = 2), drop = FALSE]
-  a2   <- alleles[, base::seq(2, n_allele_cols, by = 2), drop = FALSE]
-  miss <- base::is.na(a1) | base::is.na(a2)
+  a1   <- alleles[, seq(1, n_allele_cols, by = 2), drop = FALSE]
+  a2   <- alleles[, seq(2, n_allele_cols, by = 2), drop = FALSE]
+  miss <- is.na(a1) | is.na(a2)
   a1[miss] <- NA
   a2[miss] <- NA
 
   #### Marker names ####
-  map_path <- if (base::identical(map, "auto")) {
-    cand <- base::sub("\\.ped$", ".map", ped, ignore.case = TRUE)
-    if (cand != ped && base::file.exists(cand)) cand else NULL
+  map_path <- if (identical(map, "auto")) {
+    cand <- sub("\\.ped$", ".map", ped, ignore.case = TRUE)
+    if (cand != ped && file.exists(cand)) cand else NULL
   } else {
     map
   }
 
-  if (!base::is.null(map_path)) {
-    if (!base::file.exists(map_path))
+  if (!is.null(map_path)) {
+    if (!file.exists(map_path))
       stop("MAP file not found: ", map_path)
     map_df <- data.table::fread(map_path, header = FALSE, colClasses = "character",
                                 data.table = FALSE)
-    if (base::nrow(map_df) != n_markers)
-      stop("The .map file lists ", base::nrow(map_df), " markers but the .ped file has ",
+    if (nrow(map_df) != n_markers)
+      stop("The .map file lists ", nrow(map_df), " markers but the .ped file has ",
            n_markers, ".")
     snp_names <- map_df[[2]]
-    no_name   <- base::is.na(snp_names) | snp_names %in% c("", ".")
-    snp_names[no_name] <- base::paste(map_df[[1]][no_name],
-                                      map_df[[base::ncol(map_df)]][no_name], sep = "_")
+    no_name   <- is.na(snp_names) | snp_names %in% c("", ".")
+    snp_names[no_name] <- paste(map_df[[1]][no_name],
+                                      map_df[[ncol(map_df)]][no_name], sep = "_")
   } else {
-    snp_names <- base::paste0("SNP", base::seq_len(n_markers))
+    snp_names <- paste0("SNP", seq_len(n_markers))
   }
-  if (base::any(base::duplicated(snp_names))) {
+  if (any(duplicated(snp_names))) {
     warning("Duplicated marker names were made unique with a numeric suffix.", call. = FALSE)
-    snp_names <- base::make.unique(snp_names, sep = "_")
+    snp_names <- make.unique(snp_names, sep = "_")
   }
 
   #### Counted allele per marker ####
-  both      <- base::rbind(a1, a2)
-  n_alleles <- base::apply(both, 2, function(v) base::length(base::unique(v[!base::is.na(v)])))
-  counted   <- base::apply(both, 2, function(v) {
-    v <- v[!base::is.na(v)]
-    if (base::length(v) == 0) NA_character_ else base::max(v)
+  both      <- rbind(a1, a2)
+  n_alleles <- apply(both, 2, function(v) length(unique(v[!is.na(v)])))
+  counted   <- apply(both, 2, function(v) {
+    v <- v[!is.na(v)]
+    if (length(v) == 0) NA_character_ else max(v)
   })
-  base::names(counted) <- snp_names
+  names(counted) <- snp_names
 
-  if (!base::is.null(counted_allele)) {
-    use <- snp_names[snp_names %in% base::names(counted_allele)]
+  if (!is.null(counted_allele)) {
+    use <- snp_names[snp_names %in% names(counted_allele)]
     counted[use] <- counted_allele[use]
   }
 
   #### Drop multiallelic markers ####
   keep <- n_alleles <= 2
-  if (base::any(!keep))
-    warning(base::sum(!keep), " marker(s) with more than two alleles were dropped.",
+  if (any(!keep))
+    warning(sum(!keep), " marker(s) with more than two alleles were dropped.",
             call. = FALSE)
-  if (base::sum(keep) == 0)
+  if (sum(keep) == 0)
     stop("No biallelic markers remain in the .ped file.")
 
   #### Dosage = copies of the counted allele ####
-  cnt  <- base::matrix(counted, nrow = base::nrow(a1), ncol = n_markers, byrow = TRUE)
+  cnt  <- matrix(counted, nrow = nrow(a1), ncol = n_markers, byrow = TRUE)
   geno <- (a1 == cnt) + (a2 == cnt)
-  base::storage.mode(geno) <- "integer"
-  base::dimnames(geno) <- base::list(ids, snp_names)
+  storage.mode(geno) <- "integer"
+  dimnames(geno) <- list(ids, snp_names)
   geno    <- geno[, keep, drop = FALSE]
   counted <- counted[keep]
 
   #### Verbose report ####
   if (verbose) {
-    base::cat("\n=== PED Conversion Report ===\n")
-    base::cat("Ploidy:                 2 (PLINK .ped)\n")
-    base::cat("Marker names from:     ", if (base::is.null(map_path)) "position (no .map)" else map_path, "\n")
-    base::cat("Markers read:          ", n_markers, "\n")
-    base::cat("Markers returned:      ", base::ncol(geno), "\n")
-    base::cat("Individuals returned:  ", base::nrow(geno), "\n")
-    base::cat(base::sprintf("Missing calls:          %.2f%%\n",
-                            100 * base::mean(base::is.na(geno))))
+    cat("\n=== PED Conversion Report ===\n")
+    cat("Ploidy:                 2 (PLINK .ped)\n")
+    cat(sprintf("Marker names from:      %s\n",
+                if (is.null(map_path)) "position (no .map)" else map_path))
+    cat(sprintf("Markers read:           %s\n", n_markers))
+    cat(sprintf("Markers returned:       %d\n", ncol(geno)))
+    cat(sprintf("Individuals returned:   %d\n", nrow(geno)))
+    cat(sprintf("Missing calls:          %.2f%%\n", 100 * mean(is.na(geno))))
   }
 
   #### Return in the requested layout ####
   if (format == "matrix") {
-    base::attr(geno, "ploidy")         <- 2L
-    base::attr(geno, "counted_allele") <- counted
+    attr(geno, "ploidy")         <- 2L
+    attr(geno, "counted_allele") <- counted
     return(geno)
   }
 

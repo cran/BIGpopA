@@ -73,6 +73,10 @@ ped_validate_report = ped_validate_results$full_results
 ped_validate_report
 
 ## -----------------------------------------------------------------------------
+#marker_summary
+head(ped_validate_results$marker_summary)
+
+## -----------------------------------------------------------------------------
 #find_parentage
 find_parentage_results = find_parentage(genotypes, parents, progeny,
                                         method = "best_pair",
@@ -80,6 +84,19 @@ find_parentage_results = find_parentage(genotypes, parents, progeny,
 
 find_parentage_report = find_parentage_results$full_results
 find_parentage_report
+
+## -----------------------------------------------------------------------------
+#top_n
+find_parentage(genotypes, parents, progeny, method = "best_pair", top_n = 3,
+               verbose = FALSE, plot_results = FALSE)$full_results
+
+## -----------------------------------------------------------------------------
+#fill_pedigree
+ped_to_fill = data.frame(id = c("C1", "C2"),
+                         male_parent = c("M1", "0"),
+                         female_parent = c("0", "0"))
+find_parentage(genotypes, parents, ped_to_fill, method = "fill_pedigree",
+               verbose = FALSE, plot_results = FALSE)$full_results
 
 ## -----------------------------------------------------------------------------
 library(dplyr)
@@ -122,16 +139,7 @@ prediction = as.data.frame(solve_composition_poly(validation, freq, ploidy = 4))
 prediction
 
 ## -----------------------------------------------------------------------------
-line_cols = setdiff(names(prediction), "R2")
-
-pred_results = prediction %>%
-  mutate(
-    ID             = rownames(prediction),
-    predicted_line = line_cols[max.col(as.matrix(prediction[line_cols]), ties.method = "first")],
-    across(all_of(line_cols), ~ scales::percent(., accuracy = 0.1))
-  ) %>%
-  select(ID, predicted_line, all_of(line_cols))
-
+pred_results = assign_composition_line(solve_composition_poly(validation, freq, ploidy = 4))
 pred_results
 
 ## ----eval=FALSE---------------------------------------------------------------
@@ -143,6 +151,7 @@ pred_results
 # # breed/line composition
 # freq       = allele_freq_poly(reference, ref_ids, ploidy = 4)
 # prediction = solve_composition_poly(validation, freq, ploidy = 4)
+# composition_table = assign_composition_line(prediction, assign_threshold = 50)
 
 ## -----------------------------------------------------------------------------
 sessionInfo()

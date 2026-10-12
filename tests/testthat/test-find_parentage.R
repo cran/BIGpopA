@@ -760,3 +760,151 @@ test_that("invalid input type raises a descriptive error for find_parentage", {
     regexp = "Error reading input files"
   )
 })
+
+# ==============================================================================
+# 8. top_n
+# ==============================================================================
+
+test_that("top_n = 3 reports ranked best_pair candidates in suffix columns", {
+  f   <- make_files(base_genos, base_parents, child1_progeny)
+  out <- find_parentage(f$g, f$p, f$pr, method = "best_pair", top_n = 3,
+                        verbose = FALSE, plot_results = FALSE)
+  res <- out$full_results
+  expect_equal(res$male_parent[1],   "S1")
+  expect_equal(res$female_parent[1], "D1")
+  for (k in 2:3) {
+    expect_true(all(paste0(c("male_parent_", "female_parent_",
+                             "mendelian_error_pct_", "markers_tested_"), k) %in% names(res)))
+    expect_false(is.na(res[[paste0("male_parent_", k)]][1]))
+  }
+  expect_false("male_parent_4" %in% names(res))
+  expect_true(res[["mendelian_error_pct_2"]][1] >= as.numeric(res$mendelian_error_pct[1]))
+  expect_true(res[["mendelian_error_pct_3"]][1] >= res[["mendelian_error_pct_2"]][1])
+})
+
+test_that("top_n = 1 keeps the previous output (no suffix columns without ties)", {
+  f   <- make_files(base_genos, base_parents, child1_progeny)
+  out <- find_parentage(f$g, f$p, f$pr, method = "best_pair", top_n = 1,
+                        verbose = FALSE, plot_results = FALSE)
+  expect_false(any(grepl("_\\d+$", names(out$full_results))))
+})
+
+test_that("top_n larger than the number of candidate pairs reports all pairs", {
+  f   <- make_files(base_genos, base_parents, child1_progeny)
+  out <- find_parentage(f$g, f$p, f$pr, method = "best_pair", top_n = 10,
+                        verbose = FALSE, plot_results = FALSE)
+  expect_true("male_parent_4" %in% names(out$full_results))
+  expect_false("male_parent_5" %in% names(out$full_results))
+})
+
+test_that("top_n > 1 ranks tied pairs and does not warn when show_ties = FALSE", {
+  f <- make_files(tied_genos, tied_parents, tied_progeny)
+  expect_warning(
+    out <- find_parentage(f$g, f$p, f$pr, method = "best_pair", top_n = 2,
+                          show_ties = FALSE, verbose = FALSE, plot_results = FALSE),
+    regexp = NA
+  )
+  expect_true("male_parent_2" %in% names(out$full_results))
+  expect_false("male_parent_3" %in% names(out$full_results))
+})
+
+test_that("top_n works for single-parent methods", {
+  f   <- make_files(base_genos, base_parents, child1_progeny)
+  out <- find_parentage(f$g, f$p, f$pr, method = "best_male_parent", top_n = 2,
+                        verbose = FALSE, plot_results = FALSE)
+  res <- out$full_results
+  expect_equal(res$best_match[1],   "S1")
+  expect_equal(res$best_match_2[1], "S2")
+  expect_true(res$mendelian_error_pct_2[1] > res$mendelian_error_pct[1])
+  expect_true("markers_tested_2" %in% names(res))
+})
+
+test_that("top_n keeps progeny order for single-parent methods", {
+  f   <- make_files(base_genos, base_parents, base_progeny)
+  out <- find_parentage(f$g, f$p, f$pr, method = "best_match", top_n = 2,
+                        verbose = FALSE, plot_results = FALSE)
+  expect_equal(out$full_results$id, c("child1", "child2"))
+  expect_equal(out$full_results$best_match,   c("S1", "S2"))
+})
+
+test_that("invalid top_n values are rejected", {
+  f <- make_files(base_genos, base_parents, child1_progeny)
+  expect_error(find_parentage(f$g, f$p, f$pr, top_n = 0,   verbose = FALSE, plot_results = FALSE), "top_n")
+  expect_error(find_parentage(f$g, f$p, f$pr, top_n = 1.5, verbose = FALSE, plot_results = FALSE), "top_n")
+  expect_error(find_parentage(f$g, f$p, f$pr, top_n = "a", verbose = FALSE, plot_results = FALSE), "top_n")
+})
+
+test_that("tied_candidates counts candidates sharing the lowest error", {
+  f   <- make_files(tied_genos, tied_parents, tied_progeny)
+  out <- find_parentage(f$g, f$p, f$pr, method = "best_pair", top_n = 2,
+                        verbose = FALSE, plot_results = FALSE)
+  expect_equal(out$full_results$tied_candidates, 4L)  # 2 males x 2 females
+  f2   <- make_files(base_genos, base_parents, child1_progeny)
+  out2 <- find_parentage(f2$g, f2$p, f2$pr, method = "best_pair",
+                         verbose = FALSE, plot_results = FALSE)
+  expect_equal(out2$full_results$tied_candidates, 1L)
+  out3 <- find_parentage(f2$g, f2$p, f2$pr, method = "best_match",
+                         verbose = FALSE, plot_results = FALSE)
+  expect_equal(out3$full_results$tied_candidates, 2L)  # S1 and D1 both 0%
+})
+
+# ==============================================================================
+# 9. fill_pedigree
+# ==============================================================================
+
+fill_ped <- data.table::data.table(
+  id            = c("child1", "child2", "child2b", "S1", "child_done"),
+  male_parent   = c("S1",     "0",      "0",       "0",  "S2"),
+  female_parent = c("0",      "D2",     "0",       "0",  "D2")
+)
+fill_genos <- rbind(base_genos,
+                    data.table::data.table(id = c("child_done", "child2b"),
+                                           M1 = c(2L, 0L), M2 = c(2L, 0L), M3 = c(2L, 0L),
+                                           M4 = c(2L, 0L), M5 = c(2L, 0L)))
+
+test_that("fill_pedigree requires male_parent and female_parent columns", {
+  f <- make_files(base_genos, base_parents, child1_progeny)
+  expect_error(find_parentage(f$g, f$p, f$pr, method = "fill_pedigree",
+                              verbose = FALSE, plot_results = FALSE), "fill_pedigree")
+})
+
+test_that("fill_pedigree fills the missing parent and skips complete trios and founders", {
+  f   <- make_files(fill_genos, base_parents, fill_ped)
+  fo  <- file.path(tempdir(), "founders_fill.txt")
+  writeLines("S1", fo)
+  out <- find_parentage(f$g, f$p, f$pr, method = "fill_pedigree", founders_file = fo,
+                        verbose = FALSE, plot_results = FALSE)
+  res <- as.data.frame(out$full_results)
+  expect_false("child_done" %in% res$id)   # complete trio
+  expect_false("S1" %in% res$id)           # founder
+  expect_equal(res$female_parent[res$id == "child1"], "D1")
+  expect_equal(res$male_parent[res$id == "child1"],   "S1")
+  expect_equal(res$search_mode[res$id == "child1"],  "known_male")
+  expect_equal(res$male_parent[res$id == "child2"],   "S2")
+  expect_equal(res$female_parent[res$id == "child2"], "D2")
+  expect_equal(res$search_mode[res$id == "child2"],  "known_female")
+  expect_equal(res$search_mode[res$id == "child2b"], "pair")
+  expect_true(all(c("known_parent_error_pct", "tied_candidates") %in% names(res)))
+})
+
+test_that("fill_pedigree restricts candidates to the opposite sex and reports top_n", {
+  f   <- make_files(base_genos, base_parents, data.table::data.table(
+    id = "child1", male_parent = "S1", female_parent = "0"))
+  out <- find_parentage(f$g, f$p, f$pr, method = "fill_pedigree", top_n = 2,
+                        verbose = FALSE, plot_results = FALSE)
+  res <- out$full_results
+  expect_equal(res$male_parent[1], "S1")
+  expect_equal(res$female_parent[1], "D1")         # all-0 child: only D1 fits S1 (all 0)
+  expect_equal(res$male_parent_2[1], "S1")      # known parent stays fixed
+  expect_equal(res$female_parent_2[1], "D2")
+})
+
+test_that("fill_pedigree flags a known parent without genotypes", {
+  f <- make_files(base_genos, base_parents, data.table::data.table(
+    id = "child1", male_parent = "ghost", female_parent = "0"))
+  expect_warning(
+    out <- find_parentage(f$g, f$p, f$pr, method = "fill_pedigree",
+                          verbose = FALSE, plot_results = FALSE),
+    "ghost")
+  expect_equal(out$full_results$status[1], "known_parent_no_genotype")
+})

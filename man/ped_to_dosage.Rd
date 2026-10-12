@@ -51,7 +51,7 @@ columns, coded as the number of copies of the counted allele (0, 1, 2)
 with NA for missing calls. PLINK \code{.ped} files are diploid only.
 }
 \details{
-The \code{.ped} format stores allele letters rather than a reference/alternate
+The \code{.ped} format stores allele letters and has no reference/alternate
 pair, so the counted allele (allele B) is chosen per marker. By default it
 is the alphabetically / numerically last allele observed at the marker, so
 \code{1/2} coded files count allele \code{2} and an \code{A/G} marker counts \code{G}. To code a

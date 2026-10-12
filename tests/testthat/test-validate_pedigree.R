@@ -151,7 +151,7 @@ test_that("returns an invisible named list with all required elements", {
   expect_type(out, "list")
   expect_named(out, c("pass", "fail", "low_markers", "no_genotype_data",
                       "founders", "missing_parents", "full_results",
-                      "corrected_pedigree", "plot"),
+                      "corrected_pedigree", "marker_summary", "marker_trio_table", "plot"),
                ignore.order = TRUE)
 })
 
@@ -181,9 +181,7 @@ test_that("full_results has all expected lowercase columns", {
     "id", "orig_male_parent", "orig_female_parent",
     "trio_mendelian_error_pct", "trio_markers_tested", "status",
     "recommended_correction",
-    "male_parent_hom_error_pct", "female_parent_hom_error_pct",
-    "best_male_candidate",   "best_male_candidate_error_pct",
-    "best_female_candidate", "best_female_candidate_error_pct"
+    "male_parent_hom_error_pct", "female_parent_hom_error_pct"
   )
   expect_true(all(expected_cols %in% names(out$full_results)))
 })
@@ -262,7 +260,27 @@ test_that("fail trio with one acceptable parent gets remove_* correction", {
   r   <- out$full_results[id == "IND_D"]
   expect_true(r$recommended_correction %in%
                 c("remove_male_parent", "remove_female_parent", "remove_both",
-                  "keep_both"))
+                  "unresolved"))
+})
+
+test_that("a failing trio whose parents both pass the homozygous check is unresolved", {
+  # Recorded self: P1 x P1, but the offspring is heterozygous where P1 is
+  # homozygous at 10 of 50 markers, so it cannot be a self of P1.
+  p1   <- base::rep(c(0L, 2L), 25)
+  off  <- p1
+  off[1:10] <- 1L
+  geno <- base::data.frame(id = c("P1", "Off"), base::rbind(p1, off), row.names = NULL)
+  base::names(geno)[-1] <- base::paste0("SNP", 1:50)
+  ped  <- base::data.frame(id = "Off", male_parent = "P1", female_parent = "P1")
+
+  out <- validate_pedigree(ped, geno, verbose = FALSE, plot_results = TRUE)
+  r   <- out$full_results[id == "Off"]
+  expect_equal(r$status, "fail")
+  expect_equal(r$recommended_correction, "unresolved")
+  # Pedigree left unchanged for manual review
+  expect_equal(out$corrected_pedigree[id == "Off"]$male_parent, "P1")
+  # Plotted as a failure (grey), not as pass
+  expect_equal(out$plot$data$plot_status[out$plot$data$id == "Off"], "fail_unresolved")
 })
 
 test_that("trio_mendelian_error_pct is 0 for a perfect Mendelian trio", {
@@ -346,8 +364,6 @@ test_that("missing_male_parent status and recommendation are correct", {
   r   <- out$full_results[id == "IND_E"]
   expect_equal(r$status,                 "missing_male_parent")
   expect_equal(r$recommended_correction, "none")
-  expect_false(is.na(r$best_male_candidate))
-  expect_true(is.na(r$best_female_candidate))
 })
 
 test_that("missing_female_parent status and recommendation are correct", {
@@ -359,8 +375,6 @@ test_that("missing_female_parent status and recommendation are correct", {
   r   <- out$full_results[id == "IND_E"]
   expect_equal(r$status,                 "missing_female_parent")
   expect_equal(r$recommended_correction, "none")
-  expect_true(is.na(r$best_male_candidate))
-  expect_false(is.na(r$best_female_candidate))
 })
 
 test_that("missing_both_parents status and recommendations are correct", {
@@ -372,28 +386,6 @@ test_that("missing_both_parents status and recommendations are correct", {
   r   <- out$full_results[id == "IND_E"]
   expect_equal(r$status,                 "missing_both_parents")
   expect_equal(r$recommended_correction, "none")
-  expect_false(is.na(r$best_male_candidate))
-  expect_false(is.na(r$best_female_candidate))
-})
-
-test_that("best_male_candidate for missing_male_parent excludes the known female parent", {
-  ped <- rbind(make_pedigree(),
-               data.table(id = "IND_E", male_parent = "0",
-                          female_parent = "IND_B"))
-  f   <- write_temp_files(ped = ped)
-  out <- validate_pedigree(f$ped, f$genos, verbose = FALSE, plot_results = FALSE)
-  r   <- out$full_results[id == "IND_E"]
-  expect_false(r$best_male_candidate == "IND_B")
-})
-
-test_that("best_female_candidate for missing_female_parent excludes the known male parent", {
-  ped <- rbind(make_pedigree(),
-               data.table(id = "IND_E", male_parent = "IND_A",
-                          female_parent = "0"))
-  f   <- write_temp_files(ped = ped)
-  out <- validate_pedigree(f$ped, f$genos, verbose = FALSE, plot_results = FALSE)
-  r   <- out$full_results[id == "IND_E"]
-  expect_false(r$best_female_candidate == "IND_A")
 })
 
 test_that("missing_parents list element contains only missing_* rows", {
@@ -423,8 +415,6 @@ test_that("founders status is assigned when ID is in founders list with 0 0 pare
   r   <- out$full_results[id == "IND_A"]
   expect_equal(r$status,                 "founders")
   expect_equal(r$recommended_correction, "none")
-  expect_true(is.na(r$best_male_candidate))
-  expect_true(is.na(r$best_female_candidate))
 })
 
 test_that("founders list element contains only founders rows", {
@@ -504,8 +494,6 @@ test_that("no_genotype_data rows have NA/0 for all analysis columns", {
   r   <- out$full_results[id == "GHOST"]
   expect_true(is.na(r$trio_mendelian_error_pct))
   expect_equal(r$trio_markers_tested, 0L)
-  expect_true(is.na(r$best_male_candidate))
-  expect_true(is.na(r$best_female_candidate))
 })
 
 test_that("no_genotype_data flagged when a declared parent is absent from genotype file", {
@@ -617,7 +605,7 @@ test_that("verbose = TRUE returns valid named list without error", {
   expect_type(out, "list")
   expect_named(out, c("pass", "fail", "low_markers", "no_genotype_data",
                       "founders", "missing_parents", "full_results",
-                      "corrected_pedigree", "plot"),
+                      "corrected_pedigree", "marker_summary", "marker_trio_table", "plot"),
                ignore.order = TRUE)
 })
 
@@ -746,4 +734,32 @@ test_that("invalid input type raises an error for validate_pedigree", {
                       verbose = FALSE, plot_results = FALSE),
     regexp = "Error reading input files"
   )
+})
+
+# ==============================================================================
+# low_markers_* decisions remove only the identified parent
+# ==============================================================================
+test_that("corrected_pedigree: low_markers_remove_female_parent keeps the male parent", {
+  # IND_E (all 0) x IND_A (all 0) is fine for the male parent, but the female
+  # parent IND_B (all 2) is incompatible; only 4 markers -> low_markers
+  genos <- make_genos()[, 1:5]
+  ped   <- data.table(id = "IND_E", male_parent = "IND_A", female_parent = "IND_B")
+  out   <- validate_pedigree(ped, genos, min_markers = 10,
+                             verbose = FALSE, plot_results = FALSE)
+  r <- out$full_results[id == "IND_E"]
+  expect_equal(r$status, "low_markers")
+  expect_equal(r$recommended_correction, "low_markers_remove_female_parent")
+  expect_equal(out$corrected_pedigree[id == "IND_E"]$female_parent, "0")
+  expect_equal(out$corrected_pedigree[id == "IND_E"]$male_parent, "IND_A")
+})
+
+test_that("corrected_pedigree: low_markers_remove_male_parent keeps the female parent", {
+  genos <- make_genos()[, 1:5]
+  ped   <- data.table(id = "IND_E", male_parent = "IND_B", female_parent = "IND_A")
+  out   <- validate_pedigree(ped, genos, min_markers = 10,
+                             verbose = FALSE, plot_results = FALSE)
+  r <- out$full_results[id == "IND_E"]
+  expect_equal(r$recommended_correction, "low_markers_remove_male_parent")
+  expect_equal(out$corrected_pedigree[id == "IND_E"]$male_parent, "0")
+  expect_equal(out$corrected_pedigree[id == "IND_E"]$female_parent, "IND_A")
 })

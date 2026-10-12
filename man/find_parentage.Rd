@@ -16,7 +16,9 @@ find_parentage(
   exclude_self_match = TRUE,
   verbose = TRUE,
   plot_results = TRUE,
-  ploidy = 2
+  ploidy = 2,
+  top_n = 1,
+  founders_file = NULL
 )
 }
 \arguments{
@@ -32,10 +34,13 @@ data.table with an 'id' column and an optional 'sex' column
 ('M', 'F', or 'A'). If absent, all parents are treated as ambiguous.}
 
 \item{progeny_file}{Path to a TSV/CSV/TXT file, OR a data.frame /
-data.table with an 'id' column.}
+data.table with an 'id' column. For \code{method = "fill_pedigree"} it must
+be a pedigree with \code{id}, \code{male_parent} and \code{female_parent} columns (e.g.
+the \code{corrected_pedigree} from \code{\link[=validate_pedigree]{validate_pedigree()}}); see Details.}
 
 \item{method}{Character. One of "best_male_parent", "best_female_parent",
-"best_match", or "best_pair" (default).}
+"best_match", "best_pair" (default), or "fill_pedigree" (requires a
+pedigree as \code{progeny_file}; see Details).}
 
 \item{min_markers}{Integer. Minimum markers required; fewer flags
 low_markers (default: 10).}
@@ -66,6 +71,22 @@ test (assumes autopolyploid inheritance; conservative for allopolyploids).
 Odd ploidy (e.g. triploid), where balanced gametes are undefined, falls
 back to a model-free opposite-homozygote exclusion evaluated on
 homozygous-informative markers only (reduced power). Default is 2.}
+
+\item{top_n}{Integer >= 1. Number of best candidates to report per progeny.
+With the default of 1, only the best assignment is reported (plus tied
+best pairs when \code{show_ties = TRUE} and \code{method = "best_pair"}). With
+\code{top_n > 1}, candidates are ranked by error (ties broken by the number of
+markers tested) and the best \code{top_n} are reported: rank 1 in the base
+columns and ranks 2 to \code{top_n} in suffix columns (\code{male_parent_2},
+\code{female_parent_2}, \code{mendelian_error_pct_2}, \code{markers_tested_2} for
+"best_pair"; \code{best_match_2}, \code{mendelian_error_pct_2}, \code{markers_tested_2}
+for the other methods). Ties are then ranked like any other candidate, so
+\code{show_ties} has no effect. Progeny with fewer than \code{top_n} candidates
+have \code{NA} in the remaining ranks. Status refers to rank 1 only.}
+
+\item{founders_file}{Optional. Founder IDs as a path to a one-column file, a
+character vector of ids, or a data.frame (first column). Only used when \code{progeny_file} is a pedigree: founders with
+both parents unknown are skipped and not searched. Default is NULL.}
 }
 \value{
 A named list (returned invisibly) with elements:
@@ -73,7 +94,10 @@ A named list (returned invisibly) with elements:
 \item{pass}{Progeny with a confident parentage assignment.}
 \item{high_error}{Progeny whose best assignment exceeds the error threshold.}
 \item{low_markers}{Progeny with insufficient markers for a valid assignment.}
-\item{full_results}{Complete data.table with all progeny and all output columns.}
+\item{full_results}{Complete data.table with all progeny and all output columns.
+\code{tied_candidates} gives the number of candidates (pairs for "best_pair")
+that share the lowest error for each progeny; values above 1 mean the
+best assignment is ambiguous.}
 \item{plot}{ggplot object if plot_results = TRUE, otherwise NULL.}
 }
 }
@@ -81,6 +105,23 @@ A named list (returned invisibly) with elements:
 Assigns the most likely parent(s) to each progeny from SNP genotype data
 using Mendelian error rates or homozygous mismatch rates. Parents or progeny
 absent from the genotype file are removed with a warning.
+}
+\details{
+\strong{Method "fill_pedigree" ("fill in the blanks").} The
+\code{progeny_file} must have \code{male_parent} and \code{female_parent} columns. A parent coded \code{0}, \code{NA} or
+empty is treated as unknown and each row is handled on its own:
+a known male searches only females, a known female searches only males,
+and a row with both unknown gets the full pair search (unless listed in
+\code{founders_file}). Rows with both parents known are skipped. The search is
+the "best_pair" Mendelian trio test with the known parent held
+fixed, and candidates come from \code{parents_file} (sex M/F/A as before); the
+known parent only needs genotypes. Two columns are added to the results:
+\code{search_mode} ("pair", "known_male" or "known_female") and
+\code{known_parent_error_pct} (homozygous mismatch between the known parent and
+the progeny; a high value suggests the known parent is wrong). A known
+parent absent from the genotype file gives
+\code{status = "known_parent_no_genotype"}. Without \code{method = "fill_pedigree"},
+any \code{male_parent} / \code{female_parent} columns in \code{progeny_file} are ignored.
 }
 \examples{
 \donttest{

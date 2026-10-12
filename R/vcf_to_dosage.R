@@ -107,27 +107,27 @@ vcf_to_dosage <- function(vcf,
                           ...) {
 
   #### Input Validation ####
-  format       <- base::match.arg(format)
-  marker_names <- base::match.arg(marker_names)
+  format       <- match.arg(format)
+  marker_names <- match.arg(marker_names)
 
-  if (!base::requireNamespace("vcfR", quietly = TRUE))
+  if (!requireNamespace("vcfR", quietly = TRUE))
     stop("Package 'vcfR' is required to read VCF files. Install it with install.packages(\"vcfR\").")
-  if (!base::is.null(ploidy)) .check_ploidy(ploidy)
-  if (!base::is.null(dosage_field) && base::is.null(ploidy))
+  if (!is.null(ploidy)) .check_ploidy(ploidy)
+  if (!is.null(dosage_field) && is.null(ploidy))
     stop("ploidy must be supplied when dosage_field is used; it cannot be inferred from a dosage field.")
   for (arg in c("min_marker_call_rate", "min_sample_call_rate")) {
-    val <- base::get(arg)
-    if (base::length(val) != 1 || !base::is.numeric(val) || base::is.na(val) ||
+    val <- get(arg)
+    if (length(val) != 1 || !is.numeric(val) || is.na(val) ||
         val < 0 || val > 1)
       stop(arg, " must be a single number between 0 and 1.")
   }
 
   #### Read the VCF ####
-  if (base::is.character(vcf) && base::length(vcf) == 1) {
-    if (!base::file.exists(vcf))
+  if (is.character(vcf) && length(vcf) == 1) {
+    if (!file.exists(vcf))
       stop("VCF file not found: ", vcf)
     vcf_obj <- vcfR::read.vcfR(vcf, verbose = verbose, ...)
-  } else if (base::inherits(vcf, "vcfR")) {
+  } else if (inherits(vcf, "vcfR")) {
     vcf_obj <- vcf
   } else {
     stop("vcf must be a path to a .vcf / .vcf.gz file or a vcfR object.")
@@ -136,23 +136,23 @@ vcf_to_dosage <- function(vcf,
   # getFIX() drops to a named vector when the VCF has one variant; keep a matrix
   get_fix <- function(obj) {
     f <- vcfR::getFIX(obj)
-    if (!base::is.null(f) && base::is.null(base::dim(f)))
-      f <- base::matrix(f, nrow = 1, dimnames = base::list(NULL, base::names(f)))
+    if (!is.null(f) && is.null(dim(f)))
+      f <- matrix(f, nrow = 1, dimnames = list(NULL, names(f)))
     f
   }
 
   fix <- get_fix(vcf_obj)
-  if (base::is.null(fix) || base::nrow(fix) == 0)
+  if (is.null(fix) || nrow(fix) == 0)
     stop("The VCF contains no variants.")
 
   #### Drop multiallelic markers ####
-  n_markers_in <- base::nrow(fix)
+  n_markers_in <- nrow(fix)
   if (biallelic_only) {
-    keep <- !base::grepl(",", fix[, "ALT"], fixed = TRUE) & !base::is.na(fix[, "ALT"])
-    if (base::sum(keep) == 0)
+    keep <- !grepl(",", fix[, "ALT"], fixed = TRUE) & !is.na(fix[, "ALT"])
+    if (sum(keep) == 0)
       stop("No biallelic markers remain. Set biallelic_only = FALSE to keep multiallelic markers.")
-    if (base::any(!keep)) {
-      warning(base::sum(!keep), " multiallelic marker(s) were dropped. ",
+    if (any(!keep)) {
+      warning(sum(!keep), " multiallelic marker(s) were dropped. ",
               "Set biallelic_only = FALSE to keep them.", call. = FALSE)
       vcf_obj <- vcf_obj[keep, ]
       fix     <- get_fix(vcf_obj)
@@ -161,9 +161,9 @@ vcf_to_dosage <- function(vcf,
 
   #### Marker names ####
   ids       <- fix[, "ID"]
-  positions <- base::paste(fix[, "CHROM"], fix[, "POS"], sep = "_")
-  id_usable <- !base::any(base::is.na(ids) | ids == "." | ids == "") &&
-    !base::any(base::duplicated(ids))
+  positions <- paste(fix[, "CHROM"], fix[, "POS"], sep = "_")
+  id_usable <- !any(is.na(ids) | ids == "." | ids == "") &&
+    !any(duplicated(ids))
 
   if (marker_names == "id") {
     if (!id_usable)
@@ -174,21 +174,21 @@ vcf_to_dosage <- function(vcf,
   } else {
     snp_names <- if (id_usable) ids else positions
   }
-  if (base::any(base::duplicated(snp_names))) {
+  if (any(duplicated(snp_names))) {
     warning("Duplicated marker names were made unique with a numeric suffix.", call. = FALSE)
-    snp_names <- base::make.unique(snp_names, sep = "_")
+    snp_names <- make.unique(snp_names, sep = "_")
   }
 
   #### Extract genotype calls ####
-  if (!base::is.null(dosage_field)) {
+  if (!is.null(dosage_field)) {
 
     # Dosages are already numeric in the requested FORMAT field
     dose <- vcfR::extract.gt(vcf_obj, element = dosage_field,
                              as.numeric = TRUE, IDtoRowNames = FALSE)
-    if (base::all(base::is.na(dose)))
+    if (all(is.na(dose)))
       stop("FORMAT field '", dosage_field, "' is absent or empty in this VCF.")
-    obs_max <- base::suppressWarnings(base::max(dose, na.rm = TRUE))
-    if (base::is.finite(obs_max) && obs_max > ploidy)
+    obs_max <- suppressWarnings(max(dose, na.rm = TRUE))
+    if (is.finite(obs_max) && obs_max > ploidy)
       warning("Dosages above the requested ploidy (", ploidy,
               ") were found in field '", dosage_field, "'.", call. = FALSE)
     n_wrong_ploidy <- 0L
@@ -196,47 +196,47 @@ vcf_to_dosage <- function(vcf,
   } else {
 
     gt <- vcfR::extract.gt(vcf_obj, element = "GT", IDtoRowNames = FALSE)
-    if (base::is.null(gt) || base::all(base::is.na(gt)))
+    if (is.null(gt) || all(is.na(gt)))
       stop("No GT field found in this VCF.")
 
     # Genotype strings repeat heavily, so the parsing is done once per unique
     #   call and mapped back to the full matrix. This keeps large files cheap.
-    calls <- base::unique(base::as.vector(gt))
-    idx   <- base::match(gt, calls)
-    n_obs <- base::tabulate(idx, nbins = base::length(calls))
+    calls <- unique(as.vector(gt))
+    idx   <- match(gt, calls)
+    n_obs <- tabulate(idx, nbins = length(calls))
 
-    alleles <- base::strsplit(calls, "[/|]")                   # phased or unphased
-    n_slots <- base::lengths(alleles)
-    is_miss <- base::is.na(calls) | n_slots == 0 |
-      base::vapply(alleles,
-                   function(a) base::any(base::is.na(a) | a == "."),
-                   base::logical(1))
+    alleles <- strsplit(calls, "[/|]")                   # phased or unphased
+    n_slots <- lengths(alleles)
+    is_miss <- is.na(calls) | n_slots == 0 |
+      vapply(alleles,
+                   function(a) any(is.na(a) | a == "."),
+                   logical(1))
 
     # dosage = allele slots that are not the reference allele (0)
-    dose_u <- base::rep(NA_real_, base::length(calls))
-    dose_u[!is_miss] <- base::vapply(alleles[!is_miss],
-                                     function(a) base::sum(a != "0"),
-                                     base::numeric(1))
+    dose_u <- rep(NA_real_, length(calls))
+    dose_u[!is_miss] <- vapply(alleles[!is_miss],
+                                     function(a) sum(a != "0"),
+                                     numeric(1))
 
     #### Ploidy ####
     obs_slots <- n_slots[!is_miss]
     obs_count <- n_obs[!is_miss]
-    if (base::length(obs_slots) == 0)
+    if (length(obs_slots) == 0)
       stop("Every genotype call is missing; nothing to convert.")
-    slot_totals <- base::tapply(obs_count, obs_slots, base::sum)
-    obs_ploidy  <- base::as.integer(base::names(slot_totals)[base::which.max(slot_totals)])
+    slot_totals <- tapply(obs_count, obs_slots, sum)
+    obs_ploidy  <- as.integer(names(slot_totals)[which.max(slot_totals)])
 
     ploidy_mismatch <- FALSE
-    if (base::is.null(ploidy)) {
+    if (is.null(ploidy)) {
       ploidy <- obs_ploidy
       if (verbose)
-        base::cat("Inferred ploidy from the GT field:", ploidy, "\n")
+        cat(sprintf("Inferred ploidy from the GT field: %s\n", ploidy))
     } else {
       ploidy_mismatch <- obs_ploidy != ploidy
     }
 
     off_ploidy     <- !is_miss & n_slots != ploidy
-    n_wrong_ploidy <- base::sum(n_obs[off_ploidy])
+    n_wrong_ploidy <- sum(n_obs[off_ploidy])
 
     # One warning per situation: a contradicting ploidy, or a few stray calls
     if (ploidy_mismatch) {
@@ -250,58 +250,56 @@ vcf_to_dosage <- function(vcf,
     }
 
     dose_u[is_miss | off_ploidy] <- NA_real_
-    dose <- base::matrix(dose_u[idx],
-                         nrow = base::nrow(gt), ncol = base::ncol(gt),
-                         dimnames = base::list(NULL, base::colnames(gt)))
-    base::storage.mode(dose) <- "integer"   # dosages are whole numbers
+    dose <- matrix(dose_u[idx],
+                         nrow = nrow(gt), ncol = ncol(gt),
+                         dimnames = list(NULL, colnames(gt)))
+    storage.mode(dose) <- "integer"   # dosages are whole numbers
   }
 
   #### Reference instead of alternate dosage ####
-  ploidy <- base::as.integer(ploidy)
+  ploidy <- as.integer(ploidy)
   if (ref_dosage) dose <- ploidy - dose
 
   #### Individuals in rows, markers in columns ####
-  base::rownames(dose) <- snp_names
-  geno <- base::t(dose)
-  if (base::is.null(base::rownames(geno)) || base::any(base::rownames(geno) == ""))
+  rownames(dose) <- snp_names
+  geno <- t(dose)
+  if (is.null(rownames(geno)) || any(rownames(geno) == ""))
     stop("Sample names could not be read from the VCF.")
 
   #### Call-rate filtering ####
-  n_samples_in <- base::nrow(geno)
-  n_snps_in    <- base::ncol(geno)
+  n_samples_in <- nrow(geno)
+  n_snps_in    <- ncol(geno)
 
   if (min_marker_call_rate > 0) {
-    marker_cr <- base::colMeans(!base::is.na(geno))
+    marker_cr <- colMeans(!is.na(geno))
     geno      <- geno[, marker_cr >= min_marker_call_rate, drop = FALSE]
-    if (base::ncol(geno) == 0)
+    if (ncol(geno) == 0)
       stop("No markers passed min_marker_call_rate = ", min_marker_call_rate, ".")
   }
   if (min_sample_call_rate > 0) {
-    sample_cr <- base::rowMeans(!base::is.na(geno))
+    sample_cr <- rowMeans(!is.na(geno))
     geno      <- geno[sample_cr >= min_sample_call_rate, , drop = FALSE]
-    if (base::nrow(geno) == 0)
+    if (nrow(geno) == 0)
       stop("No individuals passed min_sample_call_rate = ", min_sample_call_rate, ".")
   }
 
   #### Verbose report ####
   if (verbose) {
-    base::cat("\n=== VCF Conversion Report ===\n")
-    base::cat("Ploidy:                ", ploidy, "\n")
-    base::cat("Markers read:          ", n_markers_in, "\n")
-    base::cat("Markers returned:      ", base::ncol(geno), "\n")
-    base::cat("Individuals returned:  ", base::nrow(geno), " of ", n_samples_in, "\n", sep = "")
-    base::cat(base::sprintf("Missing calls:          %.2f%%\n",
-                            100 * base::mean(base::is.na(geno))))
+    cat("\n=== VCF Conversion Report ===\n")
+    cat(sprintf("Ploidy:                 %s\n", ploidy))
+    cat(sprintf("Markers read:           %s\n", n_markers_in))
+    cat(sprintf("Markers returned:       %d\n", ncol(geno)))
+    cat(sprintf("Individuals returned:   %d of %s\n", nrow(geno), n_samples_in))
+    cat(sprintf("Missing calls:          %.2f%%\n", 100 * mean(is.na(geno))))
     if (n_wrong_ploidy > 0)
-      base::cat("Calls set to missing for wrong ploidy:", n_wrong_ploidy, "\n")
-    base::cat("Coding:                 dosage of the ",
-              if (ref_dosage) "reference" else "alternate", " allele (0..", ploidy, ")\n",
-              sep = "")
+      cat(sprintf("Calls set to missing for wrong ploidy: %s\n", n_wrong_ploidy))
+    cat(sprintf("Coding:                 dosage of the %s allele (0..%s)\n",
+                if (ref_dosage) "reference" else "alternate", ploidy))
   }
 
   #### Return in the requested layout ####
   if (format == "matrix") {
-    base::attr(geno, "ploidy") <- ploidy
+    attr(geno, "ploidy") <- ploidy
     return(geno)
   }
 

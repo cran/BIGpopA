@@ -51,7 +51,7 @@ allele_freq_poly <- function(geno, populations, ploidy = 2) {
 
   # Accept text files, VCFs, PLINK .ped, and in-memory tables (individuals x SNPs)
   geno    <- .read_genotypes(geno, ploidy = ploidy, format = "matrix")
-  counted <- base::attr(geno, "counted_allele")   # set only for .ped input
+  counted <- attr(geno, "counted_allele")   # set only for .ped input
 
   # Initialize returned df
   X <- matrix(NA, nrow = ncol(geno), ncol = length(populations))

@@ -13,7 +13,8 @@ validate_pedigree(
   single_parent_error_threshold = 2,
   verbose = TRUE,
   plot_results = TRUE,
-  ploidy = 2
+  ploidy = 2,
+  marker_trio_table = FALSE
 )
 }
 \arguments{
@@ -27,8 +28,8 @@ with \code{\link[=vcf_to_dosage]{vcf_to_dosage()}} using \code{ploidy}; a path t
 data.table with an id column followed by marker columns coded as
 allele-B dosage (0, 1, ..., ploidy).}
 
-\item{founders_file}{Character, optional. Path to a one-column file listing
-founder IDs. Founders with both parents coded as 0 are left unchanged.
+\item{founders_file}{Optional. Founder IDs as a path to a one-column file, a
+character vector of ids, or a data.frame (first column). Founders with both parents coded as 0 are left unchanged.
 Defaults to NULL.}
 
 \item{trio_error_threshold}{Numeric. Maximum Mendelian error percentage to
@@ -54,6 +55,10 @@ test (assumes autopolyploid inheritance; conservative for allopolyploids).
 Odd ploidy (e.g. triploid), where balanced gametes are undefined, falls
 back to a model-free opposite-homozygote exclusion evaluated on
 homozygous-informative markers only (reduced power). Default is 2.}
+
+\item{marker_trio_table}{Logical. If TRUE, the returned list includes
+\code{marker_trio_table}, a marker-by-trio table of per-marker statuses (see
+Details). Default is FALSE.}
 }
 \value{
 An invisible named list with the following elements:
@@ -66,16 +71,56 @@ An invisible named list with the following elements:
 \item{missing_parents}{Trios with one or both parents coded as 0 (non-founders).}
 \item{full_results}{Complete data.table with all trios and all output columns.}
 \item{corrected_pedigree}{Pedigree table after applying recommended corrections.}
+\item{marker_summary}{Per-marker Mendelian mismatch counts over every trio
+with both parents known and genotyped: \code{marker}, \code{trios_tested},
+\code{trios_mismatch} and \code{mismatch_pct}, sorted worst first. Markers with a
+much higher rate than the rest (e.g. paralogous or miscalled markers)
+are candidates for removal before rerunning.}
+\item{marker_trio_table}{If \code{marker_trio_table = TRUE}, a data.table with
+one row per marker (\code{marker}) and one column per trio with both parents
+known and genotyped, named \code{id_male_parent_female_parent}; otherwise NULL.
+See Details for the status values.}
 \item{plot}{ggplot object if plot_results = TRUE, otherwise NULL.}
 }
 }
 \description{
 Validates parent-offspring trios against SNP genotype data using Mendelian
-error rates. Identifies incorrect parentage assignments, suggests
-best-matching replacements, and outputs a corrected pedigree. Founder trios
+error rates. Identifies incorrect parentage assignments and outputs a
+corrected pedigree. Founder trios
 (both parents coded as 0) are preserved unchanged if a founders file is
 supplied. Trios absent from the genotype file are retained as
 no_genotype_data.
+}
+\details{
+The cells of \code{marker_trio_table} take one of these values: \code{match};
+\code{mismatch_male} or \code{mismatch_female} (the offspring is impossible with that
+parent alone, whatever the other parent contributes); \code{mismatch_both} (the
+offspring is impossible with either parent alone); \code{mismatch_combination}
+(each parent is compatible alone but the pair is not, for example a 0 x 0
+cross with a heterozygous offspring); \code{untestable} (odd ploidy, marker not
+informative); \verb{missing_*} (no call, named after every individual without a
+call: \code{missing_progeny}, \code{missing_male}, \code{missing_female}, \code{missing_male_female},
+\code{missing_progeny_male}, \code{missing_progeny_female} or \code{missing_progeny_male_female}).
+
+The \code{recommended_correction} column of \code{full_results} takes these
+values:
+\describe{
+\item{none}{Trio passes, or a parent is missing / no genotype data.}
+\item{remove_male_parent, remove_female_parent}{The trio fails and only one
+parent fails the single-parent homozygous check; that parent is set to 0
+in \code{corrected_pedigree}.}
+\item{remove_both}{The trio fails and both parents fail the homozygous
+check; both are set to 0.}
+\item{unresolved}{The trio fails but neither parent fails the homozygous
+check (for example a recorded self whose offspring carries alleles the
+parent lacks). The pedigree is likely wrong but the faulty parent cannot
+be identified, so \code{corrected_pedigree} is left unchanged for manual review.}
+\item{keep_both}{Only with low markers: the trio is within the threshold
+and both parents pass.}
+}
+Low-marker trios get the same values prefixed with \code{low_markers_}. In the
+plot, every trio above the error threshold is coloured as a failure;
+unresolved trios are shown in grey.
 }
 \examples{
 \donttest{

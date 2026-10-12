@@ -25,8 +25,8 @@ utils::globalVariables(c(
 #' @param ploidy even integer ploidy level.
 #' @return Object matching \code{g} holding the gamete dosage bound.
 #' @noRd
-.gamete_lo <- function(g, ploidy) base::pmax(0L, g - ploidy / 2L)
-.gamete_hi <- function(g, ploidy) base::pmin(ploidy / 2L, g)
+.gamete_lo <- function(g, ploidy) pmax(0L, g - ploidy / 2L)
+.gamete_hi <- function(g, ploidy) pmin(ploidy / 2L, g)
 
 #' Flag impossible offspring dosages
 #'
@@ -79,10 +79,10 @@ mendelian_error <- function(male, female, offspring, ploidy) {
 #' @noRd
 .mend_testable <- function(male, female, offspring, ploidy) {
   if (ploidy %% 2 == 0)
-    return(!base::is.na(male) & !base::is.na(female) & !base::is.na(offspring))
-  o_hom <- !base::is.na(offspring) & (offspring == 0 | offspring == ploidy)
-  m_hom <- !base::is.na(male)   & (male   == 0 | male   == ploidy)
-  f_hom <- !base::is.na(female) & (female == 0 | female == ploidy)
+    return(!is.na(male) & !is.na(female) & !is.na(offspring))
+  o_hom <- !is.na(offspring) & (offspring == 0 | offspring == ploidy)
+  m_hom <- !is.na(male)   & (male   == 0 | male   == ploidy)
+  f_hom <- !is.na(female) & (female == 0 | female == ploidy)
   o_hom & (m_hom | f_hom)
 }
 
@@ -94,10 +94,10 @@ mendelian_error <- function(male, female, offspring, ploidy) {
 #' @return Invisibly TRUE if valid; otherwise an error is thrown.
 #' @noRd
 .check_ploidy <- function(ploidy) {
-  if (base::length(ploidy) != 1 || !base::is.numeric(ploidy) ||
-      base::is.na(ploidy) || ploidy < 2 || ploidy != base::round(ploidy))
-    base::stop("ploidy must be an integer >= 2.")
-  base::invisible(TRUE)
+  if (length(ploidy) != 1 || !is.numeric(ploidy) ||
+      is.na(ploidy) || ploidy < 2 || ploidy != round(ploidy))
+    stop("ploidy must be an integer >= 2.")
+  invisible(TRUE)
 }
 
 #### Column name helpers ####
@@ -112,7 +112,7 @@ mendelian_error <- function(male, female, offspring, ploidy) {
 #' @return Normalized character vector.
 #' @noRd
 .normalize_name <- function(x) {
-  base::gsub("[ .-]+", "_", base::tolower(base::trimws(x)))
+  gsub("[ .-]+", "_", tolower(trimws(x)))
 }
 
 #' Rename columns to their standard names, ignoring case
@@ -127,23 +127,23 @@ mendelian_error <- function(male, female, offspring, ploidy) {
 #' @return \code{x} with matching columns renamed.
 #' @noRd
 .standardize_names <- function(x, cols) {
-  nm   <- base::names(x)
+  nm   <- names(x)
   norm <- .normalize_name(nm)
-  old  <- new <- base::character(0)
+  old  <- new <- character(0)
   for (col in cols) {
     if (col %in% nm) next
-    hit <- base::which(norm == col & !(nm %in% old))
-    if (base::length(hit) >= 1) {
+    hit <- which(norm == col & !(nm %in% old))
+    if (length(hit) >= 1) {
       old <- c(old, nm[hit[1]])
       new <- c(new, col)
     }
   }
-  if (base::length(old) == 0) return(x)
+  if (length(old) == 0) return(x)
   if (data.table::is.data.table(x)) {
     x <- data.table::copy(x)
     data.table::setnames(x, old, new)
   } else {
-    base::names(x)[base::match(old, base::names(x))] <- new
+    names(x)[match(old, names(x))] <- new
   }
   x
 }
@@ -160,15 +160,15 @@ mendelian_error <- function(male, female, offspring, ploidy) {
 #' @return One of "vcf", "plink", "text", "data.frame", or "matrix".
 #' @noRd
 .genotype_source <- function(x) {
-  if (base::inherits(x, "vcfR"))  return("vcf")
-  if (base::is.matrix(x))         return("matrix")
-  if (base::is.data.frame(x))     return("data.frame")
-  if (base::is.character(x) && base::length(x) == 1) {
-    if (base::grepl("\\.vcf(\\.gz)?$", x, ignore.case = TRUE)) return("vcf")
-    if (base::grepl("\\.ped$",         x, ignore.case = TRUE)) return("plink")
+  if (inherits(x, "vcfR"))  return("vcf")
+  if (is.matrix(x))         return("matrix")
+  if (is.data.frame(x))     return("data.frame")
+  if (is.character(x) && length(x) == 1) {
+    if (grepl("\\.vcf(\\.gz)?$", x, ignore.case = TRUE)) return("vcf")
+    if (grepl("\\.ped$",         x, ignore.case = TRUE)) return("plink")
     return("text")
   }
-  base::stop("Genotypes must be a file path (TXT/TSV/CSV, VCF or PLINK .ped), ",
+  stop("Genotypes must be a file path (TXT/TSV/CSV, VCF or PLINK .ped), ",
              "a vcfR object, a data.frame / data.table, or a matrix.")
 }
 
@@ -196,7 +196,7 @@ mendelian_error <- function(male, female, offspring, ploidy) {
                             format         = c("data.frame", "matrix"),
                             verbose        = FALSE,
                             counted_allele = NULL) {
-  format <- base::match.arg(format)
+  format <- match.arg(format)
   src    <- .genotype_source(x)
 
   # VCF: convert straight to the requested layout
@@ -205,8 +205,8 @@ mendelian_error <- function(male, female, offspring, ploidy) {
 
   # PLINK .ped: diploid only; a .map next to the file supplies marker names
   if (src == "plink") {
-    if (!base::is.null(ploidy) && ploidy != 2)
-      base::stop("PLINK .ped files are diploid; use ploidy = 2.")
+    if (!is.null(ploidy) && ploidy != 2)
+      stop("PLINK .ped files are diploid; use ploidy = 2.")
     return(ped_to_dosage(x, format = format, counted_allele = counted_allele,
                          verbose = verbose))
   }
@@ -214,39 +214,39 @@ mendelian_error <- function(male, female, offspring, ploidy) {
   # Text file: read to a table, then fall through to the in-memory handling
   from_text <- src == "text"
   if (from_text) {
-    if (!base::file.exists(x))
-      base::stop("Genotype file not found: ", x)
+    if (!file.exists(x))
+      stop("Genotype file not found: ", x)
     x   <- data.table::fread(x, sep = "auto", data.table = FALSE)
     src <- "data.frame"
   }
 
   # ID column: "id" in any case (id, ID, Id, ...); exact "id" preferred
   id_col <- if (src == "data.frame") {
-    nm  <- base::names(x)
+    nm  <- names(x)
     hit <- if ("id" %in% nm) "id" else nm[.normalize_name(nm) == "id"]
-    if (base::length(hit) >= 1) hit[1] else NA_character_
+    if (length(hit) >= 1) hit[1] else NA_character_
   } else {
     NA_character_
   }
   # Text files have no row names, so the first column holds the IDs
-  if (from_text && format == "matrix" && base::is.na(id_col))
-    id_col <- base::names(x)[1]
+  if (from_text && format == "matrix" && is.na(id_col))
+    id_col <- names(x)[1]
 
   if (format == "data.frame") {
     if (src == "matrix")
       return(data.table::as.data.table(x, keep.rownames = "id"))
     out <- data.table::as.data.table(x)
-    if (!base::is.na(id_col) && id_col != "id")
+    if (!is.na(id_col) && id_col != "id")
       data.table::setnames(out, id_col, "id")
     return(out)
   }
 
   # format == "matrix": individuals in named rows, markers in columns
-  if (src == "matrix" || base::is.na(id_col)) return(x)
-  x   <- base::as.data.frame(x)   # data.table subsetting differs from data.frame
-  ids <- base::as.character(x[[id_col]])
-  x   <- base::as.matrix(x[, base::names(x) != id_col, drop = FALSE])
-  base::rownames(x) <- ids
+  if (src == "matrix" || is.na(id_col)) return(x)
+  x   <- as.data.frame(x)   # data.table subsetting differs from data.frame
+  ids <- as.character(x[[id_col]])
+  x   <- as.matrix(x[, names(x) != id_col, drop = FALSE])
+  rownames(x) <- ids
   x
 }
 
@@ -301,3 +301,73 @@ QPsolve <- function(Y, X) {
   return(result)
 }
 
+#' Per-marker status of one trio
+#'
+#' Classifies every marker of one parent-offspring trio as a match, a mismatch
+#' attributed to the male parent, the female parent or both, a mismatch that only
+#' appears for the pair of parents (\code{mismatch_combination}), a marker that
+#' cannot be tested (\code{untestable}, odd ploidy only) or a missing call (named after every individual without a call, for example \code{missing_male_female}). For
+#' even ploidy a parent is incompatible with the offspring when the offspring
+#' dose lies outside that parent's gamete range plus any contribution (0 to
+#' ploidy / 2 alleles) from the other parent. For odd ploidy a parent is
+#' incompatible when it is homozygous for the opposite allele of a homozygous
+#' offspring.
+#'
+#' @param male,female,offspring dosage vectors (0..ploidy), aligned by marker.
+#' @param ploidy integer ploidy level.
+#' @return Character vector with one status per marker.
+#' @noRd
+.marker_trio_status <- function(male, female, offspring, ploidy) {
+  mm <- .mend_mismatch(male, female, offspring, ploidy)
+  tt <- .mend_testable(male, female, offspring, ploidy)
+  if (ploidy %% 2 == 0) {
+    h          <- ploidy / 2
+    parent_bad <- function(g) {
+      !(offspring >= pmax(0, g - h) & offspring <= pmin(g, h) + h)
+    }
+    male_bad   <- parent_bad(male)
+    female_bad <- parent_bad(female)
+  } else {
+    o_hom      <- offspring == 0 | offspring == ploidy
+    male_bad   <- (male   == 0 | male   == ploidy) & male   != offspring & o_hom
+    female_bad <- (female == 0 | female == ploidy) & female != offspring & o_hom
+  }
+  # missing calls are named after every individual without a call, e.g.
+  # missing_male, missing_male_female, missing_progeny_female
+  na_p <- is.na(offspring); na_m <- is.na(male); na_f <- is.na(female)
+  missing_label <- paste0("missing",
+                                ifelse(na_p, "_progeny", ""),
+                                ifelse(na_m, "_male",    ""),
+                                ifelse(na_f, "_female",  ""))
+  dplyr::case_when(
+    na_p | na_m | na_f                        ~ missing_label,
+    !tt                                       ~ "untestable",
+    !mm                                       ~ "match",
+    male_bad & !female_bad                    ~ "mismatch_male",
+    female_bad & !male_bad                    ~ "mismatch_female",
+    male_bad & female_bad                     ~ "mismatch_both",
+    TRUE                                      ~ "mismatch_combination"
+  )
+}
+
+
+# Read founder ids from a file path, a character vector of ids, or a
+# data.frame / data.table (first column). Returns a character vector.
+.read_founders <- function(x) {
+  if (is.null(x)) return(character(0))
+  if (is.data.frame(x)) return(unique(as.character(x[[1]])))
+  if (is.character(x) && length(x) == 1 && file.exists(x)) {
+    out <- tryCatch(
+      data.table::fread(x, header = FALSE, colClasses = "character"),
+      error = function(e)
+        stop("Could not read founders list. Ensure it is a plain text or CSV/TSV file.")
+    )
+    return(unique(out[[1]]))
+  }
+  # A single string that looks like a path but does not exist is a typo, not an id
+  if (is.character(x) && length(x) == 1 &&
+      grepl("[/\\\\]|\\.(txt|csv|tsv|tab)$", x, ignore.case = TRUE))
+    stop("Could not read founders list. Ensure it is a plain text or CSV/TSV file.")
+  if (is.atomic(x)) return(unique(as.character(x)))
+  stop("founders_file must be a file path, a vector of ids, or a data.frame.")
+}
