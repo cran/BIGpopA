@@ -525,6 +525,18 @@ test_that("show_ties = TRUE produces lowercase suffixed columns when ties exist"
   expect_true(any(grepl("^female_parent_", names(out$full_results))))
 })
 
+test_that("tied pairs report the error rounded to 2 decimals, like the best pair", {
+  # S1 and S1c are identical, so S1 x D1 and S1c x D1 tie at 1 error in 3 markers
+  geno <- data.frame(id = c("S1", "S1c", "D1", "C"),
+                     m1 = c(0, 0, 0, 0), m2 = c(0, 0, 2, 1), m3 = c(2, 2, 2, 0))
+  par  <- data.frame(id = c("S1", "S1c", "D1"), sex = c("M", "M", "F"))
+  res  <- find_parentage(geno, par, data.frame(id = "C"), method = "best_pair",
+                         min_markers = 1, verbose = FALSE, plot_results = FALSE)$full_results
+  expect_equal(res$male_parent_2, "S1c")
+  expect_equal(as.numeric(res$mendelian_error_pct), 33.33)
+  expect_equal(res$mendelian_error_pct_2, 33.33)
+})
+
 test_that("show_ties = FALSE warns about ties and returns single-result columns", {
   f <- make_files(tied_genos, tied_parents, tied_progeny)
   expect_warning(

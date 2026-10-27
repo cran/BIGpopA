@@ -23,7 +23,10 @@
 #'   \item{conflicting_trios}{IDs with conflicting male_parent or female_parent assignments.}
 #'   \item{inconsistent_sex_roles}{Rows where a conflicting ID appears as male_parent or female_parent.}
 #'   \item{missing_parents}{Parent IDs absent from id, added as founders.}
-#'   \item{dependencies}{Cycles detected in the pedigree. Must be resolved manually.}
+#'   \item{dependencies}{Individuals recorded as their own parent, and cycles
+#'     (individuals that are their own ancestors). Each cycle is listed once,
+#'     as a path in which every id is a recorded parent of the one before it,
+#'     back to the first id (e.g. "A -> B -> A"). Must be resolved manually.}
 #'   \item{corrected_pedigree}{Corrected pedigree table.}
 #' }
 #'
@@ -202,55 +205,96 @@ check_ped <- function(ped.file,
   }
   
   #### check 5: dependencies (cycles) -- reported only ####
-  detect_all_cycles <- function(data) {
-    adj_list <- lapply(data$id, function(x) {
-      row <- data[data$id == x, ]
-      c(row$male_parent, row$female_parent)
-    })
-    names(adj_list) <- data$id
-    
-    dfs <- function(node, visited, rec_stack, path) {
-      visited[node]   <- TRUE
-      rec_stack[node] <- TRUE
-      path   <- append(path, node)
-      cycles <- list()
-      
-      for (neighbor in adj_list[[node]]) {
-        if (neighbor %in% names(adj_list)) {
-          if (!visited[neighbor]) {
-            cycles <- append(cycles, dfs(neighbor, visited, rec_stack, path))
-          } else if (rec_stack[neighbor]) {
-            cycle_start <- match(neighbor, path)
-            cycles <- append(cycles, list(path[cycle_start:length(path)]))
-          }
+  # Individuals that are their own ancestors form a group tied by cycles (a
+  # strongly connected component of the id -> parent graph). Tarjan's
+  # algorithm finds each group once, in linear time and without recursion, so
+  # a cycle is reported once however many individuals it has and however many
+  # descendants they have. Self-parenting is reported above and skipped here.
+  cyc_ids   <- unique(data$id)
+  n_ids     <- length(cyc_ids)
+  e_child   <- match(c(data$id, data$id), cyc_ids)
+  e_parent  <- match(c(data$male_parent, data$female_parent), cyc_ids)
+  keep_edge <- !is.na(e_parent) & e_child != e_parent   # parents with a row, no self-parenting
+  e_child   <- e_child[keep_edge]
+  e_parent  <- e_parent[keep_edge]
+  up        <- split(e_parent, factor(e_child, levels = seq_len(n_ids)))   # parents of each id
+
+  index    <- rep(NA_integer_, n_ids)   # visit order
+  low      <- integer(n_ids)            # lowest visit order reachable
+  on_stack <- logical(n_ids)
+  stk_pos  <- integer(n_ids)            # position of each id in the stack
+  stk      <- integer(n_ids)            # ids of the groups being built
+  path     <- integer(n_ids)            # current search path (no recursion)
+  next_up  <- integer(n_ids)            # next parent to visit, per id
+  top      <- 0L
+  depth    <- 0L
+  counter  <- 0L
+  groups   <- list()
+
+  for (s in seq_len(n_ids)) {
+    if (!is.na(index[s])) next
+    todo <- s                                   # id to visit next
+    while (!is.na(todo) || depth > 0L) {
+      if (!is.na(todo)) {
+        # visit: number it and put it on both stacks
+        counter        <- counter + 1L
+        index[todo]    <- counter
+        low[todo]      <- counter
+        top            <- top + 1L
+        stk[top]       <- todo
+        stk_pos[todo]  <- top
+        on_stack[todo] <- TRUE
+        depth          <- depth + 1L
+        path[depth]    <- todo
+        next_up[todo]  <- 1L
+        todo           <- NA_integer_
+      }
+      v <- path[depth]
+      if (next_up[v] <= length(up[[v]])) {
+        w          <- up[[v]][next_up[v]]
+        next_up[v] <- next_up[v] + 1L
+        if (is.na(index[w])) {
+          todo <- w
+        } else if (on_stack[w]) {
+          low[v] <- min(low[v], index[w])
+        }
+      } else {
+        # all parents of v done: close v, and its group if v is the root
+        depth <- depth - 1L
+        if (depth > 0L) low[path[depth]] <- min(low[path[depth]], low[v])
+        if (low[v] == index[v]) {
+          members           <- stk[stk_pos[v]:top]
+          on_stack[members] <- FALSE
+          top               <- stk_pos[v] - 1L
+          if (length(members) > 1) groups[[length(groups) + 1]] <- sort(members)
         }
       }
-      rec_stack[node] <- FALSE
-      return(cycles)
     }
-    
-    visited   <- stats::setNames(rep(FALSE, length(adj_list)), names(adj_list))
-    rec_stack <- stats::setNames(rep(FALSE, length(adj_list)), names(adj_list))
-    all_cycles <- list()
-    
-    for (node in names(adj_list)) {
-      if (!visited[node]) {
-        node_cycles <- dfs(node, visited, rec_stack, character())
-        if (length(node_cycles) > 0)
-          all_cycles <- append(all_cycles, node_cycles)
-      }
-    }
-    return(all_cycles)
   }
-  
-  cycles <- detect_all_cycles(data)
-  if (length(cycles) > 0) {
-    for (cycle_group in cycles) {
-      cycle_ids <- unique(unlist(cycle_group))
-      errors    <- append(errors,
-                          paste("Cycle detected involving IDs:",
-                                paste(cycle_ids, collapse = " -> ")))
+
+  # One line per group, in pedigree order: the loop as a path in which each id
+  # is a recorded parent of the id before it, back to the first id
+  groups <- groups[order(vapply(groups, min, integer(1)))]
+  for (members in groups) {
+    in_group <- e_child %in% members & e_parent %in% members
+    g_child  <- e_child[in_group]
+    g_parent <- e_parent[in_group]
+    loop     <- members[1]
+    v        <- g_parent[match(members[1], g_child)]
+    while (!v %in% loop) {
+      loop <- c(loop, v)
+      v    <- g_parent[match(v, g_child)]
     }
+    loop <- c(loop[match(v, loop):length(loop)], v)
+    # a single loop when every id has one parent inside the group
+    single <- !any(duplicated(g_child[!duplicated(cbind(g_child, g_parent))]))
+    cycle  <- if (single) {
+      paste(cyc_ids[loop], collapse = " -> ")
+    } else {
+      paste0(paste(cyc_ids[members], collapse = ", "), " (more than one loop, e.g. ",
+             paste(cyc_ids[loop], collapse = " -> "), ")")
+    }
+    errors <- append(errors, paste("Cycle detected involving IDs:", cycle))
   }
   
   #### compile findings ####
@@ -259,8 +303,8 @@ check_ped <- function(ped.file,
     conflicting_trios      = conflicting_trios,
     inconsistent_sex_roles = inconsistent_sex_roles,
     missing_parents        = missing_parents,
-    dependencies           = data.frame(dependency = unique(unlist(errors)),
-                                        stringsAsFactors = FALSE),
+    dependencies           = data.frame(dependency = as.character(unique(unlist(errors))),
+                                        stringsAsFactors = FALSE),   # keeps the column when empty
     corrected_pedigree     = data %>% dplyr::select(-row_number)
   )
   

@@ -1,6 +1,6 @@
 Package: BIGpopA
 Title: Pedigree Validation Genetic Composition of Diploids & Polyploids
-Version: 2.2.0
+Version: 2.2.1
 Authors@R: c(person(given='Josue',
                     family='Chinchilla-Vargas',
                     email='josue.chinchilla@ufl.edu',
@@ -36,11 +36,11 @@ Suggests: covr, knitr (>= 1.10), rmarkdown, scales, testthat (>=
         3.0.0), vcfR (>= 1.15.0), withr
 VignetteBuilder: knitr
 Config/testthat/edition: 3
-Config/roxygen2/version: 8.1.0
+Config/roxygen2/version: 8.1.1
 NeedsCompilation: no
-Packaged: 2026-10-12 20:45:02 UTC; josue.chinchilla
+Packaged: 2026-10-27 15:44:57 UTC; josue.chinchilla
 Author: Josue Chinchilla-Vargas [cre, aut],
   Alexander Sandercock [aut],
   University of Florida [cph] (Breeding Insight)
 Repository: CRAN
-Date/Publication: 2026-10-12 21:10:02 UTC
+Date/Publication: 2026-10-27 17:40:02 UTC

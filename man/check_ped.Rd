@@ -35,7 +35,10 @@ An invisible named list of data frames:
 \item{conflicting_trios}{IDs with conflicting male_parent or female_parent assignments.}
 \item{inconsistent_sex_roles}{Rows where a conflicting ID appears as male_parent or female_parent.}
 \item{missing_parents}{Parent IDs absent from id, added as founders.}
-\item{dependencies}{Cycles detected in the pedigree. Must be resolved manually.}
+\item{dependencies}{Individuals recorded as their own parent, and cycles
+(individuals that are their own ancestors). Each cycle is listed once,
+as a path in which every id is a recorded parent of the one before it,
+back to the first id (e.g. "A -> B -> A"). Must be resolved manually.}
 \item{corrected_pedigree}{Corrected pedigree table.}
 }
 }

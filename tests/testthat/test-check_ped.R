@@ -293,6 +293,74 @@ test_that("three-node chain cycle is detected in dependencies", {
   expect_gt(nrow(out$dependencies), 0)
 })
 
+test_that("a cycle is reported once as a closed path, not once per individual or descendant", {
+  ped <- data.frame(
+    id            = c("A", "B", "C1", "C2", "C3"),
+    male_parent   = c("B", "A", "A",  "A",  "C1"),
+    female_parent = c("0", "0", "0",  "0",  "0")
+  )
+  out <- check_ped(ped, verbose = FALSE)
+  expect_identical(out$dependencies$dependency,
+                   "Cycle detected involving IDs: A -> B -> A")
+})
+
+test_that("a long cycle is reported once with every individual in it", {
+  ids <- sprintf("L%02d", 1:40)
+  ped <- data.frame(id = ids, male_parent = c(ids[-1], ids[1]), female_parent = "0")
+  out <- check_ped(ped, verbose = FALSE)
+  expect_identical(out$dependencies$dependency,
+                   paste("Cycle detected involving IDs:", paste(c(ids, ids[1]), collapse = " -> ")))
+})
+
+test_that("an individual recorded as its own parent is reported once", {
+  ped <- data.frame(
+    id            = c("A", "B"),
+    male_parent   = c("A", "0"),
+    female_parent = c("0", "0")
+  )
+  out <- check_ped(ped, verbose = FALSE)
+  expect_identical(out$dependencies$dependency,
+                   "Dependency: Individual A cannot be its own parent")
+})
+
+test_that("separate cycles get one row each, interlocked loops share one row", {
+  ped <- data.frame(
+    id            = c("A", "B", "C", "D", "E"),
+    male_parent   = c("B", "A", "D", "C", "C"),
+    female_parent = c("0", "0", "E", "0", "0")
+  )
+  out <- check_ped(ped, verbose = FALSE)
+  expect_identical(out$dependencies$dependency, c(
+    "Cycle detected involving IDs: A -> B -> A",
+    "Cycle detected involving IDs: C, D, E (more than one loop, e.g. C -> D -> C)"
+  ))
+})
+
+test_that("the cycle check is fast when ancestors are shared by many paths", {
+  # 30 generations of full-sib mating: the number of paths to the founders
+  # doubles every generation, which stalled the previous path-by-path search
+  gen <- 30
+  ped <- data.frame(
+    id            = paste0("G", rep(1:gen, each = 2), c("_m", "_f")),
+    male_parent   = c("0", "0", rep(paste0("G", 1:(gen - 1), "_m"), each = 2)),
+    female_parent = c("0", "0", rep(paste0("G", 1:(gen - 1), "_f"), each = 2))
+  )
+  elapsed <- system.time(out <- check_ped(ped, verbose = FALSE))[["elapsed"]]
+  expect_equal(nrow(out$dependencies), 0)
+  expect_lt(elapsed, 10)
+})
+
+test_that("dependencies keeps a character 'dependency' column when nothing is found", {
+  ped <- data.frame(
+    id            = c("A", "B", "C"),
+    male_parent   = c("0", "0", "A"),
+    female_parent = c("0", "0", "B")
+  )
+  out <- check_ped(ped, verbose = FALSE)
+  expect_identical(names(out$dependencies), "dependency")
+  expect_identical(out$dependencies$dependency, character(0))
+})
+
 test_that("dependencies data.frame has a 'dependency' column of type character", {
   ped <- data.frame(
     id            = c("A", "B"),

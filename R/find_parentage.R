@@ -552,8 +552,7 @@ find_parentage <- function(genotypes_file, parents_file, progeny_file,
         for (k in seq(2, num_to_report)) {
           tie_row[[paste0("male_parent_",         k)]] <- best_pairs$male_parent[k]
           tie_row[[paste0("female_parent_",       k)]] <- best_pairs$female_parent[k]
-          tie_row[[paste0("mendelian_error_pct_", k)]] <-
-            if (top_n > 1) round(percent_mismatch[best_indices[k]], 2) else min_mismatch_val
+          tie_row[[paste0("mendelian_error_pct_", k)]] <- round(percent_mismatch[best_indices[k]], 2)
           tie_row[[paste0("markers_tested_",      k)]] <- comparisons[best_indices[k]]
         }
         results_list[[j]] <- data.table::as.data.table(tie_row)
